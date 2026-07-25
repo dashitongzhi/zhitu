@@ -1,0 +1,40 @@
+# 编译产物
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/server
+/server.exe
+
+# Go 测试/覆盖率
+*.test
+*.out
+coverage.txt
+
+# 依赖
+vendor/
+
+# 数据库文件
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# 配置覆盖（本地环境）
+configs/config.local.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+#ai
+.trae/

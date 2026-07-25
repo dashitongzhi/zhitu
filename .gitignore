@@ -1,45 +1,77 @@
-# Dependencies
+# ==================== 依赖 ====================
 node_modules/
+vendor/
 __pycache__/
 *.pyc
 .venv/
 venv/
 env/
 
-# Build output
+# ==================== 构建产物 ====================
 dist/
 build/
+out/
 .next/
 .nuxt/
-out/
+.vite/
+*.tsbuildinfo
 
-# Environment variables
+# ==================== Go ====================
+# 编译产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# 测试/覆盖率
+*.test
+*.out
+coverage.txt
+
+# ==================== 环境变量与本地配置 ====================
 .env
 .env.local
 .env.*.local
+server/configs/config.yaml
 
-# IDE
+# ==================== 数据库与运行时数据 ====================
+*.sqlite
+*.sqlite3
+*.db
+server/data/
+web/data/
+
+# ==================== 上传文件 ====================
+server/data/uploads/
+**/uploads/
+
+# ==================== 日志 ====================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==================== IDE / 编辑器 ====================
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 *~
 
-# OS
+# ==================== 操作系统 ====================
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Database
-*.sqlite
-*.db
-
-# Temporary files
+# ==================== 临时文件 ====================
 *.tmp
 *.bak
+
+# ==================== Trae / AI 工具产物（可选保留） ====================
+.trae/
