@@ -1060,7 +1060,108 @@ footer {
 <!-- ==================== 三、功能需求详情 ==================== -->
 <section>
   <h2>三、功能需求详情</h2>
-  <p>以下按三大核心模块逐一展开，每个模块包含交互原型 Demo、页面布局、业务逻辑、字段规则与状态转换。</p>
+  <p>以下按登录认证、三大核心模块逐一展开，每个模块包含交互原型 Demo、页面布局、业务逻辑、字段规则与状态转换。三大核心模块各内嵌一个差异化设计，构成产品的核心竞争力。</p>
+
+  <!-- ========== 3.0 登录与认证 ========== -->
+  <div id="module-auth">
+  <span class="module-badge">模块零</span>
+  <h3>3.0 登录与认证</h3>
+
+  <p>登录是进入三大核心模块的前置门槛。落地页和 PRD 文档可免登录访问，用户进入简历实验室、面试训练场、投递看板时若未登录则拦截跳转到登录页。登录后用户的所有数据（简历版本、投递记录、面试练习历史、面试官画像分享）均与账号绑定，实现数据隔离和跨设备同步。</p>
+
+  <!-- ========== 交互原型 Demo ========== -->
+  <h4>交互原型 Demo</h4>
+  <div class="demo-frame">
+    <div class="demo-label"><span class="dot"></span> 可交互原型 — 点击标签切换登录/注册，点击 GitHub 按钮模拟第三方登录</div>
+    <div class="demo-content" style="padding:2rem 1rem;background:linear-gradient(135deg,rgba(59,130,246,0.04),rgba(6,182,212,0.04));">
+      <div style="max-width:360px;margin:0 auto;background:white;border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden;">
+        <!-- 登录/注册切换 -->
+        <div style="display:flex;border-bottom:1px solid var(--rule);">
+          <div class="auth-tab active" id="authTabLogin" onclick="authSwitchTab('login')" style="flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;">登录</div>
+          <div class="auth-tab" id="authTabRegister" onclick="authSwitchTab('register')" style="flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:500;color:var(--muted);cursor:pointer;">注册</div>
+        </div>
+        <!-- 登录表单 -->
+        <div id="authLoginForm" style="padding:1.5rem;">
+          <div style="margin-bottom:0.8rem;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">邮箱</label>
+            <input type="email" placeholder="you@example.com" style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--rule);border-radius:var(--radius-sm);font-size:0.85rem;" />
+          </div>
+          <div style="margin-bottom:1rem;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">密码</label>
+            <input type="password" placeholder="••••••••" style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--rule);border-radius:var(--radius-sm);font-size:0.85rem;" />
+          </div>
+          <button class="rl-btn-primary" style="width:100%;padding:0.6rem;font-size:0.9rem;" onclick="alert('Demo：登录成功')">登录</button>
+          <div style="text-align:center;margin:0.8rem 0;font-size:0.75rem;color:var(--muted);">— 或 —</div>
+          <button class="rl-btn-outline" style="width:100%;padding:0.6rem;font-size:0.85rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;" onclick="alert('Demo：跳转 GitHub OAuth')">
+            <span>🐙</span> GitHub 登录
+          </button>
+          <div style="text-align:center;margin-top:0.8rem;">
+            <span style="font-size:0.78rem;color:var(--accent);cursor:pointer;" onclick="alert('Demo：发送验证码到邮箱')">忘记密码？</span>
+          </div>
+        </div>
+        <!-- 注册表单 -->
+        <div id="authRegisterForm" style="padding:1.5rem;display:none;">
+          <div style="margin-bottom:0.8rem;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">邮箱</label>
+            <input type="email" placeholder="you@example.com" style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--rule);border-radius:var(--radius-sm);font-size:0.85rem;" />
+          </div>
+          <div style="margin-bottom:0.8rem;">
+            <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:0.3rem;">设置密码</label>
+            <input type="password" placeholder="至少 8 位，含字母和数字" style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--rule);border-radius:var(--radius-sm);font-size:0.85rem;" />
+          </div>
+          <button class="rl-btn-primary" style="width:100%;padding:0.6rem;font-size:0.9rem;" onclick="alert('Demo：注册成功，进入引导填写')">注册</button>
+          <div style="text-align:center;margin:0.8rem 0;font-size:0.75rem;color:var(--muted);">— 或 —</div>
+          <button class="rl-btn-outline" style="width:100%;padding:0.6rem;font-size:0.85rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;" onclick="alert('Demo：跳转 GitHub OAuth')">
+            <span>🐙</span> GitHub 注册
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 页面布局 ========== -->
+  <h4>页面布局</h4>
+  <div class="card">
+    <p>登录页采用<mark class="key">居中卡片式布局</mark>，背景使用与主站一致的低饱和度渐变。卡片顶部为登录/注册切换标签，下方为表单区域。表单底部提供第三方登录入口和忘记密码链接。整体风格简洁，降低用户的注册摩擦。</p>
+  </div>
+
+  <!-- ========== 业务逻辑 ========== -->
+  <h4>业务逻辑</h4>
+  <div class="card">
+    <h4 style="color:var(--ink);">登录方式</h4>
+    <p>支持三种登录方式：<strong>邮箱 + 密码</strong>（基础方式，注册时邮箱验证码激活）；<strong>GitHub OAuth</strong>（一键登录，适合开发者用户群，自动获取 GitHub 用户名和头像）；<strong>手机号 + 验证码</strong>（快捷登录，无需记密码）。三种方式绑定同一账号体系，用户可同时关联多种登录方式。</p>
+
+    <h4 style="color:var(--ink);">首次登录引导</h4>
+    <p>新用户注册后进入引导流程，填写基础信息：姓名、目标岗位（如「前端开发工程师」）、毕业院校。这些数据直接灌入简历实验室的个人信息模块，用户无需在简历编辑器里重复填写。引导流程可跳过，后续在个人中心补全。</p>
+
+    <h4 style="color:var(--ink);">访问控制</h4>
+    <p>落地页、产品介绍页、PRD 文档无需登录可访问。进入三大核心模块时，系统检查登录状态——未登录则跳转到登录页，登录成功后自动跳回原目标页面。已登录用户的登录态通过 Token 维持，默认 7 天有效，可勾选「记住我」延长至 30 天。</p>
+
+    <h4 style="color:var(--ink);">数据隔离与同步</h4>
+    <p>每个用户的简历版本、投递记录、面试练习历史、面试官画像分享均与账号绑定，用户之间数据完全隔离。同一账号在不同设备登录时数据自动同步，最后修改为准。用户可在个人中心查看登录设备和会话记录，支持远程登出。</p>
+  </div>
+
+  <!-- ========== 字段规则 ========== -->
+  <h4>字段规则</h4>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>字段名</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>邮箱</td><td>文本</td><td>是</td><td>唯一标识，邮箱格式校验，注册时发送验证码激活</td></tr>
+        <tr><td>密码</td><td>文本</td><td>是</td><td>至少 8 位，含字母和数字；bcrypt 加密存储</td></tr>
+        <tr><td>手机号</td><td>文本</td><td>否</td><td>11 位手机号，用于验证码登录和重要通知</td></tr>
+        <tr><td>GitHub ID</td><td>文本</td><td>否</td><td>OAuth 授权后自动获取，用于 GitHub 登录</td></tr>
+        <tr><td>用户名</td><td>文本</td><td>否</td><td>显示名称，默认使用邮箱前缀或 GitHub 用户名</td></tr>
+        <tr><td>头像</td><td>图片</td><td>否</td><td>GitHub 登录自动获取，或手动上传</td></tr>
+        <tr><td>目标岗位</td><td>文本</td><td>否</td><td>首次登录引导填写，灌入简历实验室</td></tr>
+        <tr><td>毕业院校</td><td>文本</td><td>否</td><td>首次登录引导填写，灌入简历实验室</td></tr>
+        <tr><td>登录设备</td><td>结构数组</td><td>自动</td><td>每项含设备类型、登录时间、IP 地址；支持远程登出</td></tr>
+      </tbody>
+    </table>
+  </div>
+  </div>
 
   <!-- ========== 3.1 简历实验室 ========== -->
   <div id="module-resume-lab">
@@ -1385,6 +1486,37 @@ footer {
     <p>导出 PDF 前可选择运行 ATS（Applicant Tracking System）兼容性检测——系统检查简历中是否存在图片文字、非常规字体、复杂分栏等 ATS 解析困难的元素，并给出修改建议。确保简历能被企业招聘系统正确解析，避免因格式问题被过滤。</p>
   </div>
 
+  <!-- ========== 差异化：简历竞争力雷达 ========== -->
+  <h4>差异化设计 — 简历竞争力雷达</h4>
+  <div class="card" style="border-left:3px solid var(--accent2);">
+    <p>所有简历工具都告诉你「你的简历和 JD 匹配多少分」，但没人告诉你<mark class="key">你和同岗位的其他候选人比起来处于什么水平</mark>。简历竞争力雷达解决这个问题——不只匹配 JD，更对标同岗位竞争者，让用户知道自己的简历在求职池里排第几梯队。</p>
+
+    <h4 style="color:var(--ink);">竞争力维度</h4>
+    <p>AI 从六个维度评估简历竞争力，每个维度得分对标同岗位、同学历层次的匿名简历均值：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>维度</th><th>评估内容</th><th>对标基准</th></tr></thead>
+        <tbody>
+          <tr><td>关键词覆盖</td><td>JD 核心技能词在简历中的出现率</td><td>同岗位简历均值</td></tr>
+          <tr><td>项目深度</td><td>项目描述的技术方案、量化成果、复杂度</td><td>同岗位 3 年经验者均值</td></tr>
+          <tr><td>经验相关性</td><td>工作/实习经历与目标岗位的匹配度</td><td>同岗位简历均值</td></tr>
+          <tr><td>教育背景</td><td>院校层次、专业相关度、绩点排名</td><td>同岗位应届生均值</td></tr>
+          <tr><td>技能广度</td><td>技能数量、分类覆盖、熟练度分布</td><td>同岗位简历均值</td></tr>
+          <tr><td>表达质量</td><td>STAR 法则使用、动词丰富度、量化数据密度</td><td>同岗位简历均值</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 style="color:var(--ink);">雷达图展示</h4>
+    <p>六维度以雷达图形式展示，用户简历的得分曲线与「同岗位均值」曲线叠加对比。超出均值的维度高亮为绿色（优势项），低于均值的标红（需提升项）。雷达图下方给出竞争定位：如「你的综合竞争力超过同岗位 68% 的候选人，项目深度是你的核心优势，但技能广度低于均值，建议补充 Docker、CI/CD 等岗位高频技能」。</p>
+
+    <h4 style="color:var(--ink);">数据来源</h4>
+    <p>对标基准来自平台上所有用户简历的匿名聚合数据（与面试官画像库同理，用户使用 AI 分析功能时简历数据自动脱敏后纳入统计池）。新平台冷启动阶段，基准数据可先用公开简历样本（招聘网站爬取的脱敏简历、开源简历数据集）填充，随着用户增长逐步替换为真实数据。数据量越大，对标越准。</p>
+
+    <h4 style="color:var(--ink);">与 JD 匹配的关系</h4>
+    <p>JD 匹配度回答「这份简历符不符合岗位要求」（绝对值），竞争力雷达回答「这份简历在所有应聘者里排第几」（相对值）。两者互补：JD 匹配 80 分但竞争力排名后 30%，说明大家都达标了，你的简历不够突出；JD 匹配 60 分但竞争力排名前 10%，说明岗位竞争不激烈，你的简历反而有优势。AI 综合两者给出最终建议。</p>
+  </div>
+
   <!-- ========== 参考来源说明 ========== -->
   <div class="callout callout-accent2">
     <strong>设计参考：</strong>模块管理与开关交互参考主流在线简历编辑器的左侧面板设计（模块列表 + 图标 + 拖拽排序 + 显隐开关）；A4 纸张预览与样式控制参考主流简历工具的顶部工具栏（间距/字体/皮肤/模板四项控制）；AI 驱动的 JD 匹配优化为本项目核心创新点，需要 AI 能力支持自然语言理解和简历内容生成。
@@ -1646,6 +1778,48 @@ footer {
       </table>
     </div>
     <p style="margin-top:0.6rem;">每个场景的题库由两部分组成：<strong>通用题库</strong>（覆盖常见面试问题，按岗位类别分类）和 <strong>JD 驱动题库</strong>（AI 实时根据 JD 关键词生成定制问题）。当用户关联了投递看板中的岗位时，JD 驱动题目占比提升至 60% 以上，使练习更有针对性。</p>
+  </div>
+
+  <!-- ========== 差异化：面试官画像库 ========== -->
+  <h4>差异化设计 — 面试官画像库</h4>
+  <div class="card" style="border-left:3px solid var(--accent2);">
+    <p>面试最大的焦虑来自<mark class="key">信息不对称</mark>——你不知道面试官会问什么、什么风格、难度如何。面试官画像库通过<mark class="key">众包匿名分享</mark>积累真实面试经历，消除这种不对称，是本产品区别于其他模拟面试工具的核心壁垒。</p>
+
+    <h4 style="color:var(--ink);">数据来源</h4>
+    <p>用户在真实面试结束后，可选择匿名分享面试经历。分享内容经过脱敏处理（隐藏面试官真实姓名，仅保留职位和风格标签），结构化录入画像库。分享行为获得积分奖励，积分可解锁更多画像数据——形成「贡献越多、获取越多」的正向循环。</p>
+
+    <h4 style="color:var(--ink);">画像内容</h4>
+    <p>每条面试画像包含以下结构化信息：</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>字段</th><th>说明</th><th>示例</th></tr></thead>
+        <tbody>
+          <tr><td>公司 + 岗位</td><td>面试目标</td><td>字节跳动 · 前端开发 · 一面</td></tr>
+          <tr><td>面试官风格</td><td>众包标签</td><td>深挖型 / 压力型 / 聊天型 / 引导型</td></tr>
+          <tr><td>难度评分</td><td>1-5 星</td><td>★★★★☆（4.2/5）</td></tr>
+          <tr><td>核心问题</td><td>高频追问</td><td>React Fiber 原理、手写 Promise.all、项目架构设计</td></tr>
+          <tr><td>面试时长</td><td>实际耗时</td><td>45 分钟</td></tr>
+          <tr><td>面试形式</td><td>现场/视频/电话</td><td>视频面试（飞书）</td></tr>
+          <tr><td>面试结果</td><td>通过/淘汰/待定</td><td>通过，进入二面</td></tr>
+          <tr><td>个人感受</td><td>自由文本</td><td>「面试官很注重底层原理，项目经验问得很细」</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4 style="color:var(--ink);">画像查询</h4>
+    <p>用户面试前查看目标公司的画像数据，系统聚合多条件分享生成统计概览：</p>
+    <div class="callout" style="background:rgba(6,182,212,0.06);border-color:rgba(6,182,212,0.15);">
+      <p style="margin-bottom:0.3rem;"><strong>示例：字节跳动 · 前端开发 · 一面</strong>（基于 32 条匿名分享）</p>
+      <p style="font-size:0.85rem;margin-bottom:0.3rem;">高频问题 Top 5：React Fiber 原理（72%）、手写算法题（65%）、浏览器事件循环（58%）、项目深挖（45%）、HTTP 缓存策略（38%）</p>
+      <p style="font-size:0.85rem;margin-bottom:0.3rem;">面试官风格分布：深挖型 55%、压力型 25%、聊天型 15%、引导型 5%</p>
+      <p style="font-size:0.85rem;margin-bottom:0;">平均难度 4.1/5 · 平均时长 50 分钟 · 通过率 42%</p>
+    </div>
+
+    <h4 style="color:var(--ink);">与模拟面试联动</h4>
+    <p>当用户在面试训练场选择「字节跳动 · 前端开发」进行模拟练习时，AI 面试官的出题策略会参考画像库数据——优先出现高频问题（React Fiber、事件循环），模拟面试官风格（深挖型追问），难度对标真实水平（4.1 星）。练习不再是泛泛而问，而是针对目标公司的真实面试场景精准模拟。</p>
+
+    <h4 style="color:var(--ink);">隐私与风控</h4>
+    <p>所有分享内容强制匿名，系统自动检测并屏蔽可能暴露身份的信息（面试官姓名、工号、内部项目代号）。用户可随时删除自己分享的内容。画像数据仅在本平台内展示，不开放 API 导出，防止被爬取后用于不当用途。数据展示需达到最低样本量（≥5 条）才显示统计聚合，避免单条数据被反推定位到个人。</p>
   </div>
   </div>
 
@@ -2012,6 +2186,40 @@ footer {
     <p>表格视图支持列自定义——用户可拖拽调整列顺序、隐藏不需要的列、锁定关键列（如公司名称）。系统预设三种列配置方案：<strong>精简模式</strong>（公司+岗位+状态+下一步行动，适合快速浏览）、<strong>标准模式</strong>（默认，展示 8 列核心信息）、<strong>详细模式</strong>（展示全部字段，适合深度复盘）。看板视图支持自定义分列方式——除默认的「按状态分列」外，还可按「投递渠道」「优先级」「投递时间」分列，灵活适配不同追踪视角。</p>
   </div>
 
+  <!-- ========== 差异化：求职策略洞察 ========== -->
+  <h4>差异化设计 — 求职策略洞察</h4>
+  <div class="card" style="border-left:3px solid var(--accent2);">
+    <p>市面上的投递追踪工具都只回答「你投了什么、到哪一步了」，没人回答<mark class="key">「你应该怎么投、下一步该做什么」</mark>。求职策略洞察把投递记录从「记账本」变成「决策助手」——基于你的投递数据，AI 主动分析求职策略的得失，给出可执行的建议。</p>
+
+    <h4 style="color:var(--ink);">投递漏斗分析</h4>
+    <p>系统自动生成投递漏斗：投递数 → 笔试通过数 → 一面通过数 → 二面通过数 → Offer 数。每个环节的转化率一目了然，帮你定位卡在哪一步：</p>
+    <div class="callout" style="background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.15);">
+      <p style="margin-bottom:0;font-size:0.85rem;"><strong>你的投递漏斗</strong>：投递 23 份 → 笔试通知 8 份（35%）→ 笔试通过 5 份（63%）→ 一面通过 2 份（40%）→ 二面通过 1 份（50%）→ Offer 1 份</p>
+      <p style="font-size:0.85rem;margin-top:0.3rem;color:var(--accent);">洞察：笔试通过率正常，但一面通过率偏低（40% vs 同岗位均值 55%），建议加强面试训练场的一面场景练习。</p>
+    </div>
+
+    <h4 style="color:var(--ink);">策略建议</h4>
+    <p>AI 基于投递数据模式，给出具体策略建议而非泛泛之谈：</p>
+    <ul class="num-list">
+      <li><strong>渠道效果对比</strong>：「你的 Boss 直聘投递回复率 32%，官网投递回复率仅 8%，建议优先在 Boss 直聘集中投递」</li>
+      <li><strong>时间段规律</strong>：「你周二上午投递的简历回复率最高（45%），周末投递的回复率最低（12%），建议集中在工作日上午投递」</li>
+      <li><strong>简历版本效果</strong>：「带量化数据的项目描述版本（v1.2）回复率比纯描述版本（v1.0）高 2.3 倍，建议后续投递统一使用此版本结构」</li>
+      <li><strong>行业/公司规模分布</strong>：「你投递的大厂回复率 15%，中小公司回复率 38%，但大厂 Offer 薪资平均高 30%。建议大厂中小公司 6:4 投递，兼顾成功率和期望薪资」</li>
+    </ul>
+
+    <h4 style="color:var(--ink);">同岗位匿名对比</h4>
+    <p>与简历竞争力雷达和面试官画像库同理，投递数据也纳入匿名聚合池。用户可查看「同岗位其他求职者的投递节奏」：平均投递多少家、从投递到拿 Offer 平均多少天、各渠道的回复率分布。知道自己投得太多还是太少、快了还是慢了，避免盲目焦虑或过度自信。</p>
+
+    <h4 style="color:var(--ink);">智能下一步</h4>
+    <p>看板首页顶部显示 AI 生成的「今日建议」卡片，基于当前投递状态给出当天最该做的事：</p>
+    <div class="callout" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.15);">
+      <p style="margin-bottom:0;font-size:0.85rem;"><strong>今日建议</strong>（基于 6 条进行中的投递）</p>
+      <p style="font-size:0.85rem;margin-top:0.3rem;">1. 美团二面后天 14:00，建议今天去面试训练场练习技术面场景</p>
+      <p style="font-size:0.85rem;">2. 小红书已读未回 5 天，建议主动跟进 HR</p>
+      <p style="font-size:0.85rem;margin-bottom:0;">3. 本周仅投递 2 家，低于你的平均节奏（周均 5 家），考虑补充投递</p>
+    </div>
+  </div>
+
   <div class="callout callout-accent2">
     <strong>设计参考：</strong>表格视图参考飞书多维表格的行记录展示方式（密集信息 + 状态标签 + 可排序）；看板视图参考 Trello/飞书看板的按列分卡布局（拖拽变更状态）；详情面板的时间线设计参考飞书任务详情的动态时间轴。状态流转设计覆盖了真实求职中常见的全部状态变化路径，包括被拒后复活的边界场景。
   </div>
@@ -2028,6 +2236,25 @@ footer {
 // ============================================================
 //  交互原型逻辑（简历实验室 / 面试训练场 / 投递看板）
 // ============================================================
+
+// ---------- 登录与认证 ----------
+function authSwitchTab(tab) {
+  var loginForm = document.getElementById('authLoginForm');
+  var registerForm = document.getElementById('authRegisterForm');
+  var loginTab = document.getElementById('authTabLogin');
+  var registerTab = document.getElementById('authTabRegister');
+  if (tab === 'login') {
+    loginForm.style.display = 'block';
+    registerForm.style.display = 'none';
+    loginTab.style.cssText = 'flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;';
+    registerTab.style.cssText = 'flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:500;color:var(--muted);cursor:pointer;';
+  } else {
+    loginForm.style.display = 'none';
+    registerForm.style.display = 'block';
+    loginTab.style.cssText = 'flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:500;color:var(--muted);cursor:pointer;';
+    registerTab.style.cssText = 'flex:1;text-align:center;padding:0.8rem;font-size:0.9rem;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;';
+  }
+}
 
 // ---------- 简历实验室 ----------
 function rlUploadAvatar(el) {
