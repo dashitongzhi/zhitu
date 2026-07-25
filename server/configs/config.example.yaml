@@ -1,0 +1,54 @@
+# 职途AI 后端配置文件
+# 修改后需重启服务生效
+
+server:
+  # 服务监听端口
+  port: 8080
+  # gin 模式：debug / release / test
+  mode: debug
+  # 跨域允许的来源，留空表示允许全部
+  allow_origins:
+    - "http://localhost:5173"
+    - "http://localhost:3000"
+    - "http://127.0.0.1:5173"
+
+database:
+  # 数据库文件路径（相对于 server 目录）
+  path: ./data/zhitu.db
+  # 日志级别：silent / error / warn / info
+  log_level: warn
+
+jwt:
+  # JWT 签名密钥，生产环境务必修改为强随机字符串
+  secret: "please-change-this-to-a-strong-random-secret"
+  # JWT 签发者
+  issuer: "zhitu"
+  # Token 有效期（小时），7 天 = 168
+  expire_hours: 168
+
+# 后台管理员凭据 —— 直接写在此处，不在数据库中维护
+# 管理员登录走 /api/auth/admin/login，普通用户登录走 /api/auth/login
+admin:
+  email: "admin@zhitu.com"
+  password: "admin@zhitu.com"
+
+# LLM 接口配置（OpenAI 兼容，可替换为 DeepSeek/智谱/Moonshot 等）
+# base_url 末尾不要带斜杠；不同 provider 的路径后缀由代码自动拼接
+llm:
+  base_url: "https://api.openai.com/v1"
+  api_key: "sk-please-replace-with-your-key"
+  chat_model: "gpt-4o"
+  whisper_model: "whisper-1"
+  tts_model: "tts-1"
+  tts_voice: "alloy"
+  temperature: 0.7
+  max_tokens: 4096
+  timeout_sec: 60
+
+# 文件存储（本地磁盘），生产环境可替换为对象存储
+storage:
+  base_dir: "./data/uploads"
+  audio_dir: "./data/uploads/audio"
+  tts_dir: "./data/uploads/tts"
+  resume_dir: "./data/uploads/resume"
+  max_upload_mb: 20
