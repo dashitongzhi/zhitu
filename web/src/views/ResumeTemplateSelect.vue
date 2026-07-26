@@ -6,7 +6,7 @@
           <ArrowLeftOutlined /> 返回简历实验室
         </button>
         <p class="step-label">创建简历 · 第 1 步</p>
-        <h1>先选择一张适合你的纸</h1>
+        <h1>先选择一张适合你的模板</h1>
         <p class="header-copy">模板只改变排版，不锁定内容。进入编辑器后，所有栏目都可以自由填写、隐藏和实时预览。</p>
       </div>
       <div class="header-note">
