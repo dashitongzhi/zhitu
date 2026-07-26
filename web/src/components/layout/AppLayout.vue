@@ -22,32 +22,18 @@
         mode="inline"
         :style="{ borderRight: 0 }"
       >
-        <a-menu-item key="dashboard" @click="navigateTo('/app')">
-          <template #icon>
-            <HomeOutlined />
-          </template>
-          <span>首页</span>
-        </a-menu-item>
-
-        <a-menu-item key="profile" @click="navigateTo('/app/profile')">
-          <template #icon>
-            <UserOutlined />
-          </template>
-          <span>用户档案</span>
-        </a-menu-item>
-
         <a-menu-item key="resumes" @click="navigateTo('/app/resumes')">
           <template #icon>
             <FileTextOutlined />
           </template>
-          <span>简历管理</span>
+          <span>简历实验室</span>
         </a-menu-item>
 
         <a-menu-item key="interviews" @click="navigateTo('/app/interviews')">
           <template #icon>
             <CommentOutlined />
           </template>
-          <span>面试记录</span>
+          <span>面试训练场</span>
         </a-menu-item>
 
         <a-menu-item key="deliveries" @click="navigateTo('/app/deliveries')">
@@ -66,9 +52,9 @@
         <div class="header-left">
           <a-breadcrumb>
             <a-breadcrumb-item>
-              <router-link to="/app">首页</router-link>
+              <router-link to="/app/resumes">职途AI</router-link>
             </a-breadcrumb-item>
-            <a-breadcrumb-item v-if="currentRouteName !== 'Dashboard'">
+            <a-breadcrumb-item>
               {{ currentRouteTitle }}
             </a-breadcrumb-item>
           </a-breadcrumb>
@@ -106,7 +92,7 @@
       </a-layout-header>
 
       <!-- 内容区域 -->
-      <a-layout-content class="app-content">
+      <a-layout-content class="app-content" :class="{ 'editor-content': currentRouteName === 'ResumeEditor' }">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
             <component :is="Component" />
@@ -115,7 +101,7 @@
       </a-layout-content>
 
       <!-- 底部 -->
-      <a-layout-footer class="app-footer">
+      <a-layout-footer v-if="currentRouteName !== 'ResumeEditor'" class="app-footer">
         职途AI © 2024 - 让求职更简单
       </a-layout-footer>
     </a-layout>
@@ -127,7 +113,6 @@ import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
-  HomeOutlined,
   UserOutlined,
   FileTextOutlined,
   CommentOutlined,
@@ -145,7 +130,7 @@ const authStore = useAuthStore()
 const collapsed = ref(false)
 
 // 菜单选中状态
-const selectedKeys = ref<string[]>(['dashboard'])
+const selectedKeys = ref<string[]>(['resumes'])
 const openKeys = ref<string[]>([])
 
 // 当前路由名称
@@ -154,11 +139,10 @@ const currentRouteName = computed(() => route.name as string)
 // 当前路由标题
 const currentRouteTitle = computed(() => {
   const titleMap: Record<string, string> = {
-    Profile: '用户档案',
-    ResumeList: '简历管理',
-    ResumeEditor: '简历编辑',
-    InterviewList: '面试记录',
-    InterviewRoom: '面试详情',
+    ResumeList: '简历实验室',
+    ResumeEditor: '简历实验室',
+    InterviewList: '面试训练场',
+    InterviewRoom: '面试训练场',
     DeliveryKanban: '投递看板',
     ChangePassword: '修改密码',
   }
@@ -176,7 +160,7 @@ watch(
   () => route.path,
   (path) => {
     if (path === '/app' || path === '/app/') {
-      selectedKeys.value = ['dashboard']
+      selectedKeys.value = ['resumes']
     } else {
       // 形如 /app/profile -> 取第三段
       const seg = path.split('/')[2]
@@ -283,6 +267,16 @@ const handleLogout = () => {
   border-radius: 8px;
   min-height: calc(100vh - 64px - 70px - 48px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.app-content.editor-content {
+  height: calc(100vh - 64px);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
 }
 
 .app-footer {

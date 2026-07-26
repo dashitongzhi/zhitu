@@ -34,6 +34,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/admin/AdminLogin.vue'),
     meta: { requiresAuth: false, isAdmin: false },
   },
+  // 简历实验室公开预览：用于本地设计验收，不依赖后端登录态
+  {
+    path: '/resume-lab-preview',
+    name: 'ResumeLabPreview',
+    component: () => import('@/views/ResumeEditor.vue'),
+    meta: { requiresAuth: false, isPublic: false },
+  },
   // 管理端路由
   {
     path: '/admin',
@@ -66,17 +73,10 @@ const routes: RouteRecordRaw[] = [
     component: AppLayout,
     meta: { requiresAuth: true },
     children: [
-      // 首页仪表盘
+      // 登录后默认进入简历实验室
       {
         path: '',
-        name: 'Dashboard',
-        component: () => import('@/views/Dashboard.vue'),
-      },
-      // 用户档案
-      {
-        path: 'profile',
-        name: 'Profile',
-        component: () => import('@/views/Profile.vue'),
+        redirect: '/app/resumes',
       },
       // 简历列表
       {
