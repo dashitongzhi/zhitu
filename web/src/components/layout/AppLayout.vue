@@ -155,6 +155,7 @@ const currentRouteName = computed(() => route.name as string)
 const currentRouteTitle = computed(() => {
   const titleMap: Record<string, string> = {
     ResumeList: '简历实验室',
+    ResumeTemplateSelect: '选择简历模板',
     ResumeEditor: '简历实验室',
     InterviewList: '面试训练场',
     InterviewRoom: '面试训练场',

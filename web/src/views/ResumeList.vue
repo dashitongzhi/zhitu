@@ -6,7 +6,7 @@
         <h2 class="page-title">简历管理</h2>
         <p class="page-desc">支持多份简历、版本管理、AI 生成与评分</p>
       </div>
-      <a-button type="primary" @click="showCreateModal = true">
+      <a-button type="primary" @click="router.push('/app/resumes/new')">
         <PlusOutlined /> 创建简历
       </a-button>
     </div>
@@ -77,73 +77,13 @@
       </a-row>
     </a-spin>
 
-    <!-- 创建简历弹窗 -->
-    <a-modal
-      v-model:open="showCreateModal"
-      title="创建简历"
-      :confirm-loading="creating"
-      @ok="handleCreate"
-      @cancel="resetCreateForm"
-      width="600px"
-    >
-      <a-form
-        ref="createFormRef"
-        :model="createForm"
-        :rules="createRules"
-        layout="vertical"
-      >
-        <a-form-item label="简历名称" name="name">
-          <a-input
-            v-model:value="createForm.name"
-            placeholder="如：字节后端简历"
-            :maxlength="50"
-            show-count
-          />
-        </a-form-item>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="目标公司" name="target_company">
-              <a-input v-model:value="createForm.target_company" placeholder="如：字节跳动" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="目标职位" name="target_position">
-              <a-input v-model:value="createForm.target_position" placeholder="如：后端开发" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item label="生成场景" name="scene">
-          <a-select v-model:value="createForm.scene" placeholder="请选择">
-            <a-select-option value="manual">手动编辑</a-select-option>
-            <a-select-option value="jd">基于 JD 生成</a-select-option>
-            <a-select-option value="scenario">场景化生成</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="目标 JD（可选）" name="target_jd">
-          <a-textarea
-            v-model:value="createForm.target_jd"
-            placeholder="粘贴岗位描述，便于 AI 生成更精准的简历"
-            :rows="4"
-            :maxlength="2000"
-            show-count
-          />
-        </a-form-item>
-        <a-form-item label="初始内容（可选）" name="initial_content">
-          <a-textarea
-            v-model:value="createForm.initial_content"
-            placeholder="可粘贴已有简历内容（JSON 字符串），将作为 v1.0 版本"
-            :rows="4"
-          />
-        </a-form-item>
-      </a-form>
-    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Modal, message, type FormInstance } from 'ant-design-vue'
+import { Modal } from 'ant-design-vue'
 import {
   PlusOutlined,
   FileTextOutlined,
@@ -152,31 +92,10 @@ import {
   ArrowRightOutlined,
 } from '@ant-design/icons-vue'
 import { useResumeStore } from '@/stores/resume'
-import type { Resume, ResumeScene, CreateResumeRequest } from '@/types/models'
+import type { Resume, ResumeScene } from '@/types/models'
 
 const router = useRouter()
 const resumeStore = useResumeStore()
-
-// 创建弹窗状态
-const showCreateModal = ref(false)
-const creating = ref(false)
-const createFormRef = ref<FormInstance>()
-
-const createForm = reactive<CreateResumeRequest>({
-  name: '',
-  target_company: '',
-  target_position: '',
-  target_jd: '',
-  scene: 'manual',
-  initial_content: '',
-})
-
-const createRules = {
-  name: [
-    { required: true, message: '请输入简历名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '长度需在 2-50 个字符之间', trigger: 'blur' },
-  ],
-}
 
 // 场景标签
 const sceneLabel = (scene: ResumeScene | string): string => {
@@ -232,44 +151,6 @@ const handleMenuClick = (key: string, resume: Resume) => {
       },
     })
   }
-}
-
-// 创建简历
-const handleCreate = async () => {
-  try {
-    await createFormRef.value?.validate()
-  } catch {
-    return
-  }
-  creating.value = true
-  const payload: CreateResumeRequest = {
-    name: createForm.name.trim(),
-    target_company: createForm.target_company?.trim() || undefined,
-    target_position: createForm.target_position?.trim() || undefined,
-    target_jd: createForm.target_jd?.trim() || undefined,
-    scene: createForm.scene,
-    initial_content: createForm.initial_content?.trim() || undefined,
-  }
-  const created = await resumeStore.create(payload)
-  creating.value = false
-  if (created) {
-    showCreateModal.value = false
-    resetCreateForm()
-    // 直接进入编辑器
-    router.push(`/app/resumes/${created.id}`)
-  } else {
-    message.error('创建失败，请重试')
-  }
-}
-
-const resetCreateForm = () => {
-  createForm.name = ''
-  createForm.target_company = ''
-  createForm.target_position = ''
-  createForm.target_jd = ''
-  createForm.scene = 'manual'
-  createForm.initial_content = ''
-  createFormRef.value?.resetFields()
 }
 
 onMounted(() => {

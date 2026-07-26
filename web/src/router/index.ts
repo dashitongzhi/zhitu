@@ -84,6 +84,12 @@ const routes: RouteRecordRaw[] = [
         name: 'ResumeList',
         component: () => import('@/views/ResumeList.vue'),
       },
+      // 创建简历前先选择文本化模板
+      {
+        path: 'resumes/new',
+        name: 'ResumeTemplateSelect',
+        component: () => import('@/views/ResumeTemplateSelect.vue'),
+      },
       // 简历编辑器
       {
         path: 'resumes/:id',

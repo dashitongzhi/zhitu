@@ -42,8 +42,9 @@
         <label class="toolbar-select">
           <LayoutOutlined />
           <select v-model="templateStyle">
-            <option value="classic">经典单栏</option>
-            <option value="modern">现代强调</option>
+            <option v-for="template in resumeTemplates" :key="template.id" :value="template.id">
+              {{ template.name }}
+            </option>
           </select>
         </label>
         <label class="toolbar-select">
@@ -352,6 +353,7 @@ import {
   UserOutlined, SendOutlined,
 } from '@ant-design/icons-vue'
 import { useResumeStore } from '@/stores/resume'
+import { getResumeTemplate, resumeTemplates, type ResumeTemplateId } from '@/data/resumeTemplates'
 import type { ResumeVersion } from '@/types/models'
 
 interface ResumeEducation { school: string; major: string; degree: string; start: string; end: string; courses: string; gpa: string }
@@ -359,6 +361,7 @@ interface ResumeWork { company: string; position: string; start: string; end: st
 interface ResumeProject { name: string; role: string; start: string; end: string; description: string; tech_stack: string[]; url: string }
 interface ResumeSkill { category: string; name: string; proficiency: string }
 interface ResumeContent {
+  template_style: ResumeTemplateId
   personal: { name: string; gender: string; age: string; phone: string; email: string; github: string; avatar: string; city: string }
   intention: { position: string; city: string; salary: string; arrival: string; industry: string }
   education: ResumeEducation[]; work: ResumeWork[]; project: ResumeProject[]; skills: ResumeSkill[]
@@ -371,7 +374,7 @@ const resumeStore = useResumeStore()
 const demoMode = computed(() => route.name === 'ResumeLabPreview' || route.query.demo === '1')
 const resumeId = computed(() => Number(route.params.id))
 const editableName = ref('后端工程师－张明')
-const templateStyle = ref('classic')
+const templateStyle = ref<ResumeTemplateId>('classic')
 const fontFamily = ref('sans')
 const density = ref('comfortable')
 const zoom = ref(82)
@@ -425,7 +428,17 @@ const suggestions = computed(() => {
 
 watch(() => resumeStore.currentVersion, (version) => {
   if (!version || demoMode.value) return
-  try { Object.assign(resumeContent, normalizeContent(JSON.parse(version.content))) } catch { message.warning('当前版本内容不是可识别的结构化简历 JSON') }
+  try {
+    const normalized = normalizeContent(JSON.parse(version.content))
+    Object.assign(resumeContent, normalized)
+    templateStyle.value = normalized.template_style
+  } catch {
+    message.warning('当前版本内容不是可识别的结构化简历 JSON')
+  }
+})
+
+watch(templateStyle, (value) => {
+  resumeContent.template_style = value
 })
 
 function createSampleContent(): ResumeContent {
@@ -452,6 +465,7 @@ function createSampleContent(): ResumeContent {
 
 function normalizeContent(value: any): ResumeContent {
   return {
+    template_style: getResumeTemplate(value.template_style).id,
     personal: { name: '', gender: '', age: '', phone: '', email: '', github: '', avatar: '', city: '', ...(value.personal || {}) },
     intention: { position: '', city: '', salary: '', arrival: '', industry: '', ...(value.intention || {}) },
     education: Array.isArray(value.education) ? value.education : [],
@@ -614,6 +628,72 @@ onMounted(async () => {
 .skill-section p + p { margin-top: 3px; }
 .template-modern .paper-header { padding: 18px 20px; border: 0; background: #edf5f0; }
 .template-modern .paper-section h2 { color: var(--green); border-color: #8fb9a3; }
+.template-executive { color: #202a35; font-family: Georgia, 'Songti SC', serif !important; }
+.template-executive .paper-header { text-align: center; border-bottom: 1px solid #28384d; }
+.template-executive .paper-header h1 { color: #28384d; letter-spacing: .14em; }
+.template-executive .paper-role { color: #667689; }
+.template-executive .contact-line { justify-content: center; }
+.template-executive .paper-section h2 { border: 0; color: #28384d; text-align: center; letter-spacing: .16em; }
+.template-executive .paper-section h2::after { content: ''; width: 34px; height: 1px; display: block; margin: 7px auto 0; background: #9ba6b2; }
+.template-compact { padding: 42px 48px; }
+.template-compact .paper-header { padding-bottom: 10px; }
+.template-compact .paper-header h1 { font-size: 27px; }
+.template-compact .paper-section { margin-top: 13px; }
+.template-compact .paper-section h2 { margin-bottom: 6px; padding-bottom: 4px; font-size: 13px; }
+.template-compact .resume-entry + .resume-entry { margin-top: 7px; }
+.template-compact .resume-entry li { margin: 1px 0; line-height: 1.42; }
+.template-sidebar {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  column-gap: 34px;
+  align-content: start;
+  padding: 0 48px 52px 0;
+  background: linear-gradient(90deg, #214c3d 0 176px, #fff 176px);
+}
+.template-sidebar .paper-header {
+  grid-column: 1;
+  grid-row: 1 / span 20;
+  min-height: 1123px;
+  padding: 56px 23px;
+  border: 0;
+  color: #fff;
+}
+.template-sidebar .paper-header h1 { font-size: 25px; letter-spacing: .03em; }
+.template-sidebar .paper-role { color: #bfe1d2; }
+.template-sidebar .contact-line { flex-direction: column; gap: 8px; color: #e7f2ed; line-height: 1.45; }
+.template-sidebar .contact-line span::after { display: none; }
+.template-sidebar .paper-section { grid-column: 2; margin-top: 20px; }
+.template-sidebar .paper-section:first-of-type { margin-top: 56px; }
+.template-sidebar .paper-section h2 { color: #214c3d; border-color: #8eb2a2; }
+.template-editorial .paper-header { position: relative; padding-bottom: 24px; border: 0; }
+.template-editorial .paper-header::after { content: ''; width: 72px; height: 5px; position: absolute; bottom: 0; left: 0; background: #b5523b; }
+.template-editorial .paper-header h1 { max-width: 520px; color: #9d4532; font-family: Georgia, 'Songti SC', serif; font-size: 44px; line-height: .95; letter-spacing: -.02em; }
+.template-editorial .paper-role { color: #3f4944; letter-spacing: .08em; }
+.template-editorial .paper-section h2 { border: 0; color: #a04935; font-family: Georgia, 'Songti SC', serif; font-size: 18px; }
+.template-minimal { padding: 78px 74px; }
+.template-minimal .paper-header { padding-bottom: 28px; border-bottom: 1px solid #a9b0ac; }
+.template-minimal .paper-header h1 { font-size: 29px; font-weight: 550; letter-spacing: .18em; }
+.template-minimal .paper-role { color: #555f5a; font-weight: 550; }
+.template-minimal .paper-section { margin-top: 29px; }
+.template-minimal .paper-section h2 { border: 0; font-size: 12px; font-weight: 650; letter-spacing: .22em; }
+.template-academic { padding: 50px 54px; font-family: Georgia, 'Songti SC', serif !important; color: #262522; }
+.template-academic .paper-header { text-align: center; border-bottom: 2px double #4e4b46; }
+.template-academic .paper-header h1 { font-size: 28px; font-weight: 600; }
+.template-academic .paper-role { color: #4d4a45; font-style: italic; font-weight: 500; }
+.template-academic .contact-line { justify-content: center; }
+.template-academic .paper-section h2 { border-bottom: 1px solid #59554f; font-size: 13px; text-transform: uppercase; }
+.template-creative { padding-top: 0; }
+.template-creative .paper-header { margin: 0 -60px 28px; padding: 48px 60px 34px; border: 0; background: #126b51; color: #fff; }
+.template-creative .paper-header h1 { font-size: 39px; letter-spacing: -.015em; }
+.template-creative .paper-role { color: #c9eadc; }
+.template-creative .contact-line { color: #edf8f3; }
+.template-creative .paper-section h2 { padding: 7px 10px; border: 0; background: #e7f2ed; color: #126b51; }
+.template-graduate { position: relative; padding-left: 72px; }
+.template-graduate::before { content: ''; width: 8px; position: absolute; inset: 0 auto 0 0; background: #277c87; }
+.template-graduate .paper-header { border-color: #277c87; }
+.template-graduate .paper-header h1 { color: #205f68; }
+.template-graduate .paper-role { color: #277c87; }
+.template-graduate .paper-section h2 { color: #277c87; border-color: #9bc1c6; }
 .density-compact { padding-top: 46px; padding-bottom: 46px; }
 .density-compact .paper-section { margin-top: 15px; }
 .density-compact .resume-entry + .resume-entry { margin-top: 9px; }
