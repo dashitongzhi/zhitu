@@ -1,5 +1,31 @@
 <template>
-  <div class="resume-lab" :class="{ 'is-demo': demoMode }">
+  <div class="resume-shell" :class="{ 'has-preview-sidebar': demoMode }">
+    <aside v-if="demoMode" class="product-sidebar" aria-label="产品导航">
+      <button class="sidebar-brand" type="button" @click="router.push('/')">
+        <span class="sidebar-logo">职</span>
+        <span><strong>职途AI</strong><small>智能求职工作台</small></span>
+      </button>
+      <nav class="product-nav">
+        <button class="active" type="button" aria-current="page">
+          <FileTextOutlined />
+          <span><strong>简历实验室</strong><small>编辑与实时预览</small></span>
+        </button>
+        <button type="button" @click="previewNavigate('interview')">
+          <CommentOutlined />
+          <span><strong>面试训练场</strong><small>模拟面试与复盘</small></span>
+        </button>
+        <button type="button" @click="previewNavigate('delivery')">
+          <SendOutlined />
+          <span><strong>投递看板</strong><small>跟踪求职进度</small></span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="status-dot" />
+        本地设计预览
+      </div>
+    </aside>
+
+    <div class="resume-lab" :class="{ 'is-demo': demoMode }">
     <header class="lab-toolbar">
       <div class="toolbar-leading">
         <button class="icon-button" type="button" aria-label="返回简历列表" @click="backToList">
@@ -63,9 +89,14 @@
           <div class="panel-hint">填写内容后，右侧 A4 简历会即时更新</div>
 
           <section class="form-section" :class="{ collapsed: collapsed.personal }">
-            <button class="section-heading" type="button" @click="toggleSection('personal')">
-              <span><UserOutlined /> 基本信息</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('personal') }">
+              <label class="visibility-toggle" title="控制基本信息是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.personal" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <UserOutlined /><strong>基本信息</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起基本信息" @click="toggleSection('personal')"><DownOutlined /></button>
+            </div>
             <div class="section-body grid-two">
               <label class="field full"><span>姓名</span><input v-model="resumeContent.personal.name" /></label>
               <label class="field"><span>电话</span><input v-model="resumeContent.personal.phone" /></label>
@@ -76,9 +107,14 @@
           </section>
 
           <section class="form-section" :class="{ collapsed: collapsed.intention }">
-            <button class="section-heading" type="button" @click="toggleSection('intention')">
-              <span><AimOutlined /> 求职意向</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('intention') }">
+              <label class="visibility-toggle" title="控制求职意向是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.intention" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <AimOutlined /><strong>求职意向</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起求职意向" @click="toggleSection('intention')"><DownOutlined /></button>
+            </div>
             <div class="section-body grid-two">
               <label class="field full"><span>目标岗位</span><input v-model="resumeContent.intention.position" /></label>
               <label class="field"><span>期望城市</span><input v-model="resumeContent.intention.city" /></label>
@@ -89,9 +125,14 @@
           </section>
 
           <section class="form-section" :class="{ collapsed: collapsed.education }">
-            <button class="section-heading" type="button" @click="toggleSection('education')">
-              <span><ReadOutlined /> 教育经历</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('education') }">
+              <label class="visibility-toggle" title="控制教育经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.education" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ReadOutlined /><strong>教育经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起教育经历" @click="toggleSection('education')"><DownOutlined /></button>
+            </div>
             <div class="section-body repeat-list">
               <article v-for="(item, index) in resumeContent.education" :key="`edu-${index}`" class="repeat-item">
                 <button class="remove-item" type="button" @click="resumeContent.education.splice(index, 1)"><DeleteOutlined /></button>
@@ -109,9 +150,14 @@
           </section>
 
           <section class="form-section" :class="{ collapsed: collapsed.work }">
-            <button class="section-heading" type="button" @click="toggleSection('work')">
-              <span><BankOutlined /> 工作经历</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('work') }">
+              <label class="visibility-toggle" title="控制工作经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.work" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <BankOutlined /><strong>工作经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起工作经历" @click="toggleSection('work')"><DownOutlined /></button>
+            </div>
             <div class="section-body repeat-list">
               <article v-for="(item, index) in resumeContent.work" :key="`work-${index}`" class="repeat-item">
                 <button class="remove-item" type="button" @click="resumeContent.work.splice(index, 1)"><DeleteOutlined /></button>
@@ -127,9 +173,14 @@
           </section>
 
           <section class="form-section" :class="{ collapsed: collapsed.project }">
-            <button class="section-heading" type="button" @click="toggleSection('project')">
-              <span><ProjectOutlined /> 项目经历</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('project') }">
+              <label class="visibility-toggle" title="控制项目经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.project" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ProjectOutlined /><strong>项目经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起项目经历" @click="toggleSection('project')"><DownOutlined /></button>
+            </div>
             <div class="section-body repeat-list">
               <article v-for="(item, index) in resumeContent.project" :key="`project-${index}`" class="repeat-item">
                 <button class="remove-item" type="button" @click="resumeContent.project.splice(index, 1)"><DeleteOutlined /></button>
@@ -146,9 +197,14 @@
           </section>
 
           <section class="form-section" :class="{ collapsed: collapsed.skills }">
-            <button class="section-heading" type="button" @click="toggleSection('skills')">
-              <span><ToolOutlined /> 专业技能</span><DownOutlined />
-            </button>
+            <div class="section-heading" :class="{ disabled: !isVisible('skills') }">
+              <label class="visibility-toggle" title="控制专业技能是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.skills" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ToolOutlined /><strong>专业技能</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起专业技能" @click="toggleSection('skills')"><DownOutlined /></button>
+            </div>
             <div class="section-body repeat-list">
               <article v-for="(item, index) in resumeContent.skills" :key="`skill-${index}`" class="skill-row">
                 <input v-model="item.category" placeholder="分类" />
@@ -173,7 +229,7 @@
             :class="[`template-${templateStyle}`, `font-${fontFamily}`, `density-${density}`]"
             :style="{ transform: `scale(${zoom / 100})` }"
           >
-            <header class="paper-header">
+            <header v-if="isVisible('personal')" class="paper-header">
               <h1>{{ resumeContent.personal.name || '你的姓名' }}</h1>
               <p class="paper-role">{{ resumeContent.intention.position || '目标职位' }}</p>
               <div class="contact-line">
@@ -280,6 +336,7 @@
         <a-alert message="当前结构化内容会保存为一个新的简历版本" type="info" show-icon />
       </a-form>
     </a-modal>
+    </div>
   </div>
 </template>
 
@@ -288,11 +345,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
-  AimOutlined, ArrowLeftOutlined, BankOutlined, CheckCircleOutlined, CloseOutlined,
+  AimOutlined, ArrowLeftOutlined, BankOutlined, CheckCircleOutlined, CheckOutlined, CloseOutlined,
   ColumnHeightOutlined, DeleteOutlined, DownloadOutlined, DownOutlined, FileTextOutlined,
-  FontSizeOutlined, HistoryOutlined, LayoutOutlined, PlusOutlined, ProjectOutlined,
+  FontSizeOutlined, HistoryOutlined, LayoutOutlined, PlusOutlined, ProjectOutlined, CommentOutlined,
   ReadOutlined, RobotOutlined, SafetyCertificateOutlined, SaveOutlined, ToolOutlined,
-  UserOutlined,
+  UserOutlined, SendOutlined,
 } from '@ant-design/icons-vue'
 import { useResumeStore } from '@/stores/resume'
 import type { ResumeVersion } from '@/types/models'
@@ -330,7 +387,13 @@ const resumeContent = reactive<ResumeContent>(createSampleContent())
 const serializedContent = computed(() => JSON.stringify(resumeContent, null, 2))
 const contentStats = computed(() => ({
   chars: serializedContent.value.length,
-  sections: [resumeContent.education, resumeContent.work, resumeContent.project, resumeContent.skills].filter((items) => items.length).length + 2,
+  sections:
+    (resumeContent.module_visibility.personal !== false ? 1 : 0)
+    + (resumeContent.module_visibility.intention !== false ? 1 : 0)
+    + (resumeContent.module_visibility.education !== false && resumeContent.education.length ? 1 : 0)
+    + (resumeContent.module_visibility.work !== false && resumeContent.work.length ? 1 : 0)
+    + (resumeContent.module_visibility.project !== false && resumeContent.project.length ? 1 : 0)
+    + (resumeContent.module_visibility.skills !== false && resumeContent.skills.length ? 1 : 0),
 }))
 const intentionSummary = computed(() => [resumeContent.intention.position, resumeContent.intention.city, resumeContent.intention.salary, resumeContent.intention.arrival].filter(Boolean).join(' ｜ '))
 const diagnosticScore = computed(() => {
@@ -397,7 +460,10 @@ function normalizeContent(value: any): ResumeContent {
     skills: Array.isArray(value.skills) ? value.skills : [],
     honor: Array.isArray(value.honor) ? value.honor : [], custom: Array.isArray(value.custom) ? value.custom : [],
     module_order: value.module_order || ['personal', 'intention', 'education', 'work', 'project', 'skills', 'honor'],
-    module_visibility: value.module_visibility || { personal: true, intention: true, education: true, work: true, project: true, skills: true, honor: true },
+    module_visibility: {
+      personal: true, intention: true, education: true, work: true, project: true, skills: true, honor: true,
+      ...(value.module_visibility || {}),
+    },
   }
 }
 
@@ -424,6 +490,9 @@ const handleSaveVersion = async () => {
   if (version) { showSaveVersionModal.value = false; newVersionNote.value = '' }
 }
 const handleOptimize = () => message.success(demoMode.value ? '已完成本地诊断演示；接入后端后可生成真实优化版本' : '请使用现有 AI 操作生成优化版本')
+const previewNavigate = (target: 'interview' | 'delivery') => {
+  message.info(target === 'interview' ? '面试训练场将在下一阶段完善' : '投递看板将在下一阶段完善')
+}
 const exportResume = () => window.print()
 const backToList = () => demoMode.value ? router.push('/') : router.push('/app/resumes')
 const formatVersionDate = (value: string) => value ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
@@ -440,7 +509,25 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.resume-lab { --ink: #17211d; --muted: #68736d; --line: #dfe4e0; --green: #087443; --green-soft: #e8f3ed; height: 100vh; min-height: 760px; overflow: hidden; background: #eef0ed; color: var(--ink); }
+.resume-shell { --ink: #17211d; --muted: #68736d; --line: #dfe4e0; --green: #087443; --green-soft: #e8f3ed; width: 100%; height: 100%; min-height: 0; display: flex; overflow: hidden; background: #eef0ed; color: var(--ink); }
+.resume-shell.has-preview-sidebar { height: 100dvh; }
+.product-sidebar { flex: 0 0 216px; min-width: 216px; display: flex; flex-direction: column; padding: 18px 12px 14px; border-right: 1px solid #dce2de; background: #f8faf8; position: relative; z-index: 8; }
+.sidebar-brand { width: 100%; display: flex; align-items: center; gap: 11px; padding: 4px 7px 20px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.sidebar-logo { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; background: var(--green); color: #fff; font-size: 17px; font-weight: 850; }
+.sidebar-brand > span:last-child, .product-nav button > span { min-width: 0; display: flex; flex-direction: column; }
+.sidebar-brand strong { font-size: 16px; line-height: 1.2; }
+.sidebar-brand small { margin-top: 3px; color: #7a847f; font-size: 10px; }
+.product-nav { display: flex; flex-direction: column; gap: 6px; }
+.product-nav button { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 11px; padding: 10px 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #505c56; text-align: left; cursor: pointer; transition: background .18s, border-color .18s, color .18s; }
+.product-nav button:hover { background: #eef3f0; color: var(--ink); }
+.product-nav button.active { border-color: #bfdbcc; background: var(--green-soft); color: var(--green); }
+.product-nav button > :deep(.anticon) { flex: 0 0 18px; font-size: 17px; }
+.product-nav strong { font-size: 13px; line-height: 1.25; }
+.product-nav small { margin-top: 4px; overflow: hidden; color: #87918c; font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.product-nav button.active small { color: #56806a; }
+.sidebar-foot { margin-top: auto; display: flex; align-items: center; gap: 7px; padding: 10px; color: #7b8680; font-size: 10px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2f9e66; box-shadow: 0 0 0 3px #dff1e7; }
+.resume-lab { height: 100%; min-height: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; background: #eef0ed; color: var(--ink); }
 .lab-toolbar { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 24px; background: #fff; border-bottom: 1px solid var(--line); position: relative; z-index: 5; }
 .toolbar-leading, .toolbar-controls { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .toolbar-controls { overflow-x: auto; scrollbar-width: none; }
@@ -459,7 +546,7 @@ onMounted(async () => {
 .zoom-control button { width: 30px; height: 100%; border: 0; background: transparent; cursor: pointer; }
 .zoom-control span { width: 52px; text-align: center; font-size: 12px; }
 .export-button { background: var(--green); box-shadow: none; }
-.lab-workspace { height: calc(100vh - 64px); display: grid; grid-template-columns: 340px minmax(640px, 1fr) 320px; }
+.lab-workspace { height: calc(100% - 64px); min-height: 0; display: grid; grid-template-columns: clamp(290px, 23vw, 340px) minmax(0, 1fr) clamp(280px, 21vw, 320px); }
 .editor-panel, .ai-panel { background: #fff; min-width: 0; overflow: hidden; }
 .editor-panel { border-right: 1px solid var(--line); }
 .ai-panel { border-left: 1px solid var(--line); padding: 20px; overflow-y: auto; }
@@ -471,10 +558,20 @@ onMounted(async () => {
 .editor-scroll, .raw-json-panel { height: calc(100% - 51px); overflow-y: auto; }
 .raw-json-panel pre { margin: 0; padding: 18px; color: #34423b; font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .form-section { border-bottom: 1px solid var(--line); }
-.section-heading { width: 100%; height: 48px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border: 0; background: #fff; color: var(--ink); cursor: pointer; font-weight: 720; }
-.section-heading span { display: flex; align-items: center; gap: 9px; }
-.section-heading > :deep(.anticon) { transition: transform .2s; color: #89918d; }
-.form-section.collapsed .section-heading > :deep(.anticon) { transform: rotate(-90deg); }
+.section-heading { width: 100%; height: 48px; padding: 0 9px 0 16px; display: flex; align-items: center; justify-content: space-between; background: #fff; color: var(--ink); transition: opacity .18s, background .18s; }
+.section-heading.disabled { opacity: .55; background: #fafbfa; }
+.visibility-toggle { min-width: 0; flex: 1; height: 100%; display: flex; align-items: center; gap: 9px; cursor: pointer; font-weight: 720; }
+.visibility-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.custom-check { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border: 1.5px solid #aeb8b2; border-radius: 5px; background: #fff; color: transparent; transition: background .18s, border-color .18s, box-shadow .18s; }
+.custom-check :deep(.anticon) { font-size: 11px; }
+.visibility-toggle input:checked + .custom-check { border-color: var(--green); background: var(--green); color: #fff; }
+.visibility-toggle input:focus-visible + .custom-check { box-shadow: 0 0 0 3px rgba(8,116,67,.15); }
+.visibility-toggle > :deep(.anticon) { color: #526159; }
+.visibility-toggle strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.collapse-button { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #89918d; cursor: pointer; }
+.collapse-button:hover { background: #f0f3f1; color: var(--ink); }
+.collapse-button :deep(.anticon) { transition: transform .2s; }
+.form-section.collapsed .collapse-button :deep(.anticon) { transform: rotate(-90deg); }
 .form-section.collapsed .section-body { display: none; }
 .section-body { padding: 0 16px 16px; }
 .grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -551,7 +648,37 @@ onMounted(async () => {
 .version-list button.active { border-color: var(--green); background: var(--green-soft); }
 .version-list button span { display: flex; justify-content: space-between; }
 .version-list small, .version-list em { color: var(--muted); font-size: 11px; font-style: normal; }
-@media (max-width: 1180px) { .lab-workspace { grid-template-columns: 320px minmax(600px, 1fr); } .ai-panel { display: none; } .toolbar-select { display: none; } }
-@media (max-width: 820px) { .resume-lab { height: auto; min-height: 100vh; overflow: visible; } .lab-toolbar { height: auto; min-height: 64px; padding: 10px 14px; flex-wrap: wrap; } .toolbar-controls { width: 100%; padding-bottom: 2px; } .save-state { display: none; } .lab-workspace { height: auto; display: flex; flex-direction: column; } .editor-panel { height: 58vh; border: 0; border-bottom: 1px solid var(--line); } .preview-stage { height: 72vh; } .resume-paper { flex: 0 0 794px; } }
-@media print { .lab-toolbar, .editor-panel, .ai-panel, .stage-meta { display: none !important; } .resume-lab, .lab-workspace, .preview-stage, .paper-viewport { display: block; height: auto; overflow: visible; background: #fff; padding: 0; } .resume-paper { transform: none !important; box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; } }
+@media (max-width: 1380px) { .lab-workspace { grid-template-columns: clamp(286px, 27vw, 320px) minmax(0, 1fr); } .ai-panel { display: none; } .toolbar-select { display: none; } .save-state { display: none; } }
+@media (max-width: 1060px) { .product-sidebar { flex-basis: 176px; min-width: 176px; padding-inline: 9px; } .product-nav small, .sidebar-foot { display: none; } .product-nav button { min-height: 50px; } .lab-toolbar { padding-inline: 14px; gap: 10px; } .resume-name { width: 150px; } }
+@media (max-width: 820px) {
+  .resume-shell, .resume-shell.has-preview-sidebar { height: 100dvh; min-height: 0; flex-direction: column; overflow: hidden; }
+  .product-sidebar { width: 100%; min-width: 0; flex: 0 0 58px; min-height: 58px; flex-direction: row; align-items: center; padding: 7px 10px; border-right: 0; border-bottom: 1px solid #dce2de; }
+  .sidebar-brand { width: auto; padding: 0 8px 0 0; }
+  .sidebar-logo { width: 34px; height: 34px; flex-basis: 34px; }
+  .product-nav { flex: 1; min-width: 0; flex-direction: row; justify-content: flex-end; gap: 3px; }
+  .product-nav button { width: auto; min-width: 44px; min-height: 42px; flex: 1 1 0; justify-content: center; padding: 6px 8px; }
+  .product-nav button > span { display: flex; }
+  .product-nav button small { display: none; }
+  .product-nav button > :deep(.anticon) { font-size: 15px; }
+  .product-nav strong { font-size: 11px; white-space: nowrap; }
+  .resume-lab { height: calc(100dvh - 58px); min-height: 0; }
+  .lab-toolbar { height: 108px; min-height: 108px; padding: 9px 12px; flex-wrap: wrap; align-content: center; }
+  .toolbar-leading { width: 100%; }
+  .toolbar-controls { width: 100%; overflow-x: auto; padding-bottom: 2px; }
+  .resume-name { width: min(46vw, 190px); }
+  .lab-workspace { height: calc(100% - 108px); display: grid; grid-template-columns: minmax(270px, 38vw) minmax(0, 1fr); }
+  .editor-panel { height: auto; border-right: 1px solid var(--line); border-bottom: 0; }
+  .preview-stage { height: auto; min-height: 0; }
+  .paper-viewport { padding: 18px 18px 60px; justify-content: flex-start; }
+  .resume-paper { flex: 0 0 794px; }
+}
+@media (max-width: 620px) {
+  .product-nav button { padding-inline: 5px; }
+  .product-nav button > :deep(.anticon) { display: none; }
+  .lab-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(270px, 46%) minmax(0, 54%); }
+  .editor-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+  .stage-meta span:last-child { display: none; }
+}
+@media (max-height: 680px) and (min-width: 821px) { .lab-toolbar { height: 54px; padding-inline: 14px; } .lab-workspace { height: calc(100% - 54px); } .panel-tabs { height: 44px; } .editor-scroll, .raw-json-panel { height: calc(100% - 44px); } }
+@media print { .product-sidebar, .lab-toolbar, .editor-panel, .ai-panel, .stage-meta { display: none !important; } .resume-shell, .resume-lab, .lab-workspace, .preview-stage, .paper-viewport { display: block; height: auto; overflow: visible; background: #fff; padding: 0; } .resume-paper { transform: none !important; box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; } }
 </style>

@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -128,6 +128,21 @@ const authStore = useAuthStore()
 
 // 侧边栏折叠状态
 const collapsed = ref(false)
+const autoCollapsedForViewport = ref(false)
+
+const syncSidebarToViewport = () => {
+  const shouldCollapse = window.innerWidth <= 1100
+  if (shouldCollapse === autoCollapsedForViewport.value) return
+  autoCollapsedForViewport.value = shouldCollapse
+  collapsed.value = shouldCollapse
+}
+
+onMounted(() => {
+  syncSidebarToViewport()
+  window.addEventListener('resize', syncSidebarToViewport)
+})
+
+onBeforeUnmount(() => window.removeEventListener('resize', syncSidebarToViewport))
 
 // 菜单选中状态
 const selectedKeys = ref<string[]>(['resumes'])
