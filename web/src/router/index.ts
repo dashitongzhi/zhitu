@@ -103,6 +103,11 @@ const routes: RouteRecordRaw[] = [
         name: 'InterviewList',
         component: () => import('@/views/InterviewList.vue'),
       },
+      {
+        path: 'interviews/new',
+        name: 'InterviewSceneSelect',
+        component: () => import('@/views/InterviewSceneSelect.vue'),
+      },
       // 面试房间
       {
         path: 'interviews/:id',

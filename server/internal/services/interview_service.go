@@ -32,11 +32,12 @@ const (
 	ScenePressure = "pressure"
 	SceneHR       = "hr"
 	SceneGroup    = "group"
+	SceneTeaching = "teaching"
 )
 
 // 面试状态枚举
 const (
-	StatusOngoing  = "ongoing"
+	StatusOngoing   = "ongoing"
 	StatusCompleted = "completed"
 	StatusCancelled = "cancelled"
 )
@@ -74,8 +75,8 @@ type CreateInterviewInput struct {
 
 // Create 创建面试会话，并自动生成第一道题
 func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateInterviewInput) (*models.Interview, error) {
-	if in.Scene != SceneTech && in.Scene != SceneBehavior && in.Scene != ScenePressure && in.Scene != SceneHR && in.Scene != SceneGroup {
-		return nil, errors.New("invalid scene, must be one of: tech/behavior/pressure/hr/group")
+	if in.Scene != SceneTech && in.Scene != SceneBehavior && in.Scene != ScenePressure && in.Scene != SceneHR && in.Scene != SceneGroup && in.Scene != SceneTeaching {
+		return nil, errors.New("invalid scene, must be one of: tech/behavior/pressure/hr/group/teaching")
 	}
 	if in.Difficulty == "" {
 		in.Difficulty = "mid"
@@ -299,8 +300,8 @@ func (s *InterviewService) endAndGenerateReport(ctx context.Context, interview *
 	interview.Status = StatusCompleted
 	interview.EndedAt = &now
 	if err := s.db.Model(interview).Updates(map[string]interface{}{
-		"status":    StatusCompleted,
-		"ended_at":  now,
+		"status":   StatusCompleted,
+		"ended_at": now,
 	}).Error; err != nil {
 		return err
 	}
@@ -403,6 +404,7 @@ func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, q
 		ScenePressure: "压力面（挑战性/陷阱题）",
 		SceneHR:       "HR 面（薪资/规划/离职原因）",
 		SceneGroup:    "群面模拟（多角色讨论）",
+		SceneTeaching: "教资模拟教室（结构化问答、模拟试讲、考官答辩）",
 	}[interview.Scene]
 
 	diffDesc := map[string]string{
@@ -423,6 +425,7 @@ func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, q
 3. 结合以下 JD 关键词出题
 4. 难度递增
 5. 模拟真实面试官语气，不要透露你是 AI
+6. 如果是教资模拟教室：前两题进行结构化问答，中间两题要求候选人围绕抽题主题完成试讲片段，最后一题以考官身份针对教学设计进行答辩追问
 
 企业风格提示：根据你对 %s 面试风格的了解调整出题策略（如字节跳动注重底层原理与项目深挖，阿里注重系统设计，腾讯注重技术广度等；若不确定则按通用标准）。
 
@@ -578,7 +581,7 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 	}
 
 	var reportData struct {
-		Summary         string `json:"summary"`
+		Summary         string   `json:"summary"`
 		Highlights      []string `json:"highlights"`
 		Improvements    []string `json:"improvements"`
 		Recommendations []string `json:"recommendations"`
@@ -616,6 +619,7 @@ func calcOverallScore(scores []models.InterviewScore, scene string) int {
 		ScenePressure: {"professional": 0.2, "expression": 0.15, "logic": 0.25, "adaptability": 0.35, "pace": 0.05},
 		SceneHR:       {"professional": 0.1, "expression": 0.3, "logic": 0.15, "adaptability": 0.2, "pace": 0.25},
 		SceneGroup:    {"professional": 0.2, "expression": 0.25, "logic": 0.15, "adaptability": 0.3, "pace": 0.1},
+		SceneTeaching: {"professional": 0.3, "expression": 0.25, "logic": 0.15, "adaptability": 0.2, "pace": 0.1},
 	}[scene]
 	if weights == nil {
 		weights = map[string]float64{"professional": 0.25, "expression": 0.2, "logic": 0.2, "adaptability": 0.2, "pace": 0.15}

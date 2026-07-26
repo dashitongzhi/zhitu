@@ -288,7 +288,7 @@ export interface JDMatchResult {
 // ==================== 模拟面试相关 ====================
 
 // 面试场景
-export type InterviewScene = 'tech' | 'behavior' | 'pressure' | 'hr' | 'group'
+export type InterviewScene = 'tech' | 'behavior' | 'pressure' | 'hr' | 'group' | 'teaching'
 
 // 面试模式
 export type InterviewMode = 'text' | 'voice' | 'hybrid'

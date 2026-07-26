@@ -3,11 +3,11 @@
     <!-- 顶部工具栏 -->
     <div class="page-header">
       <div class="header-info">
-        <h2 class="page-title">模拟面试</h2>
-        <p class="page-desc">AI 自动发问，支持文字/语音/混合模式，结束生成复盘报告</p>
+        <h2 class="page-title">面试训练场</h2>
+        <p class="page-desc">进入真实场景反复演练，让考官、流程和规则共同塑造训练</p>
       </div>
-      <a-button type="primary" @click="showCreateModal = true">
-        <PlusOutlined /> 开始新面试
+      <a-button type="primary" @click="router.push('/app/interviews/new')">
+        <PlusOutlined /> 选择训练场景
       </a-button>
     </div>
 
@@ -60,95 +60,13 @@
       </a-table>
     </a-spin>
 
-    <!-- 创建面试弹窗 -->
-    <a-modal
-      v-model:open="showCreateModal"
-      title="开始新面试"
-      :confirm-loading="creating"
-      @ok="handleCreate"
-      @cancel="resetCreateForm"
-      width="640px"
-    >
-      <a-form
-        ref="createFormRef"
-        :model="createForm"
-        :rules="createRules"
-        layout="vertical"
-      >
-        <a-form-item label="面试场景" name="scene" required>
-          <a-select v-model:value="createForm.scene" placeholder="请选择">
-            <a-select-option value="tech">技术面</a-select-option>
-            <a-select-option value="behavior">行为面</a-select-option>
-            <a-select-option value="pressure">压力面</a-select-option>
-            <a-select-option value="hr">HR 面</a-select-option>
-            <a-select-option value="group">群面</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="目标公司" name="target_company">
-              <a-input v-model:value="createForm.target_company" placeholder="如：字节跳动" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="目标职位" name="target_position" required>
-              <a-input v-model:value="createForm.target_position" placeholder="如：后端开发" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item label="目标 JD（可选）" name="target_jd">
-          <a-textarea
-            v-model:value="createForm.target_jd"
-            :rows="3"
-            placeholder="粘贴岗位描述，AI 将据此出题"
-          />
-        </a-form-item>
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <a-form-item label="难度" name="difficulty">
-              <a-select v-model:value="createForm.difficulty">
-                <a-select-option value="junior">初级</a-select-option>
-                <a-select-option value="mid">中级</a-select-option>
-                <a-select-option value="senior">高级</a-select-option>
-                <a-select-option value="mixed">混合自适应</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="题数" name="total_questions">
-              <a-input-number
-                v-model:value="createForm.total_questions"
-                :min="1"
-                :max="20"
-                style="width: 100%"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="模式" name="mode">
-              <a-select v-model:value="createForm.mode">
-                <a-select-option value="text">纯文字</a-select-option>
-                <a-select-option value="voice">语音</a-select-option>
-                <a-select-option value="hybrid">混合</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-alert
-          message="创建后将自动生成第一道题，可在面试房间内开始作答"
-          type="info"
-          show-icon
-          banner
-        />
-      </a-form>
-    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { message, type FormInstance, type TableColumnsType } from 'ant-design-vue'
+import { type TableColumnsType } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { useInterviewStore } from '@/stores/interview'
 import type {
@@ -156,30 +74,10 @@ import type {
   InterviewMode,
   InterviewDifficulty,
   InterviewStatus,
-  CreateInterviewRequest,
 } from '@/types/models'
 
 const router = useRouter()
 const interviewStore = useInterviewStore()
-
-const showCreateModal = ref(false)
-const creating = ref(false)
-const createFormRef = ref<FormInstance>()
-
-const createForm = reactive<CreateInterviewRequest>({
-  scene: 'tech',
-  target_company: '',
-  target_position: '',
-  target_jd: '',
-  difficulty: 'mid',
-  total_questions: 5,
-  mode: 'text',
-})
-
-const createRules = {
-  scene: [{ required: true, message: '请选择面试场景', trigger: 'change' }],
-  target_position: [{ required: true, message: '请输入目标职位', trigger: 'blur' }],
-}
 
 const columns: TableColumnsType = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
@@ -196,6 +94,7 @@ const columns: TableColumnsType = [
 // 场景
 const sceneLabel = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
+    teaching: '模拟教室',
     tech: '技术面',
     behavior: '行为面',
     pressure: '压力面',
@@ -206,6 +105,7 @@ const sceneLabel = (s: InterviewScene | string): string => {
 }
 const sceneColor = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
+    teaching: 'green',
     tech: 'blue',
     behavior: 'cyan',
     pressure: 'red',
@@ -279,45 +179,6 @@ const formatDate = (dateStr: string): string => {
 // 进入面试房间
 const enterRoom = (id: number) => {
   router.push(`/app/interviews/${id}`)
-}
-
-// 创建面试
-const handleCreate = async () => {
-  try {
-    await createFormRef.value?.validate()
-  } catch {
-    return
-  }
-  creating.value = true
-  const payload: CreateInterviewRequest = {
-    scene: createForm.scene,
-    target_company: createForm.target_company?.trim() || undefined,
-    target_position: createForm.target_position.trim(),
-    target_jd: createForm.target_jd?.trim() || undefined,
-    difficulty: createForm.difficulty,
-    total_questions: createForm.total_questions,
-    mode: createForm.mode,
-  }
-  const created = await interviewStore.create(payload)
-  creating.value = false
-  if (created) {
-    showCreateModal.value = false
-    resetCreateForm()
-    router.push(`/app/interviews/${created.id}`)
-  } else {
-    message.error('创建失败，请重试')
-  }
-}
-
-const resetCreateForm = () => {
-  createForm.scene = 'tech'
-  createForm.target_company = ''
-  createForm.target_position = ''
-  createForm.target_jd = ''
-  createForm.difficulty = 'mid'
-  createForm.total_questions = 5
-  createForm.mode = 'text'
-  createFormRef.value?.resetFields()
 }
 
 onMounted(() => {
