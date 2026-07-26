@@ -1,15 +1,7 @@
 <template>
   <div class="scene-page">
     <header class="scene-header">
-      <button class="back-button" @click="router.push('/app/interviews')">
-        <ArrowLeftOutlined /> 返回训练记录
-      </button>
-      <div>
-        <p class="step-label">面试训练场 · 选择场景</p>
-        <h1>先进入一间真实的面试现场</h1>
-        <p class="intro">场地、考官和流程共同决定训练内容。第一阶段开放模拟教室，其他场景将陆续加入。</p>
-      </div>
-      <div class="scene-index"><strong>01</strong><span>/ 12 场景已开放</span></div>
+      <h1>选择合适的面试场景</h1>
     </header>
 
     <main class="scene-layout">
@@ -115,7 +107,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeftOutlined, PlayCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue'
+import { PlayCircleOutlined, LoadingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useInterviewStore } from '@/stores/interview'
 
@@ -149,33 +141,32 @@ const scenes = [
 
 const createTeachingInterview = async () => {
   creating.value = true
-  const topic = form.topic.trim() || '由考官根据学段和学科现场抽题'
-  const interview = await interviewStore.create({
-    scene: 'teaching',
-    target_company: form.interviewType,
-    target_position: `${form.grade}${form.subject}教师`,
-    target_jd: `面试类型：${form.interviewType}\n学段：${form.grade}\n学科：${form.subject}\n试讲主题：${topic}\n考官风格：${form.examinerStyle}\n流程：结构化问答、模拟试讲、考官答辩。`,
-    difficulty: form.examinerStyle === '连续追问' ? 'senior' : 'mid',
-    total_questions: 5,
-    mode: 'hybrid',
-  })
-  creating.value = false
-  if (!interview) {
-    message.error('考场创建失败，请检查大模型配置')
-    return
+  try {
+    const topic = form.topic.trim() || '由考官根据学段和学科现场抽题'
+    const interview = await interviewStore.create({
+      scene: 'teaching',
+      target_company: form.interviewType,
+      target_position: `${form.grade}${form.subject}教师`,
+      target_jd: `面试类型：${form.interviewType}\n学段：${form.grade}\n学科：${form.subject}\n试讲主题：${topic}\n考官风格：${form.examinerStyle}\n流程：结构化问答、模拟试讲、考官答辩。`,
+      difficulty: form.examinerStyle === '连续追问' ? 'senior' : 'mid',
+      total_questions: 5,
+      mode: 'hybrid',
+    })
+    if (!interview) {
+      message.error('考场创建失败，请稍后重试')
+      return
+    }
+    await router.push(`/app/interviews/${interview.id}`)
+  } finally {
+    creating.value = false
   }
-  router.push(`/app/interviews/${interview.id}`)
 }
 </script>
 
 <style scoped>
-.scene-page{box-sizing:border-box;width:100%;max-width:100%;min-height:calc(100dvh - 64px);overflow-x:hidden;padding:32px clamp(20px,4vw,64px) 48px;background:#edf0ea;color:#16342d}
-.scene-header{box-sizing:border-box;width:100%;max-width:1440px;margin:0 auto 28px;display:grid;grid-template-columns:180px minmax(0,1fr) auto;align-items:end;gap:32px}
-.back-button{align-self:start;border:0;background:transparent;color:#557068;cursor:pointer;padding:8px 0;text-align:left}
-.step-label{margin:0 0 8px;color:#b45c36;font-size:12px;font-weight:700;letter-spacing:.12em}
-h1{margin:0;font-family:"Songti SC","STSong",serif;font-size:clamp(34px,4vw,58px);font-weight:600;letter-spacing:-.04em}
-.intro{max-width:640px;margin:10px 0 0;color:#61716c;line-height:1.7}
-.scene-index{display:flex;align-items:baseline;gap:8px;color:#71827c}.scene-index strong{font-size:34px;color:#173e34}.scene-index span{font-size:12px}
+.scene-page{box-sizing:border-box;width:100%;max-width:100%;min-height:calc(100dvh - 64px);overflow-x:hidden;padding:20px clamp(20px,4vw,64px) 48px;background:#edf0ea;color:#16342d}
+.scene-header{box-sizing:border-box;width:100%;max-width:1440px;margin:0 auto 18px}
+h1{margin:0;font-family:"Songti SC","STSong",serif;font-size:clamp(38px,4.2vw,64px);font-weight:600;line-height:1.12;letter-spacing:-.04em}
 .scene-layout{box-sizing:border-box;width:100%;max-width:1440px;margin:auto}
 .scene-library{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
 .scene-card{position:relative;isolation:isolate;min-height:164px;overflow:hidden;border:1px solid rgba(255,255,255,.4);background-image:url('/scenes/interview-scenes-atlas.jpg');background-size:400% 300%;display:grid;grid-template-columns:1fr auto;align-content:end;gap:4px 12px;padding:18px;text-align:left;color:#fff;cursor:pointer;box-shadow:0 8px 24px rgba(24,48,41,.09);transition:transform .22s ease,box-shadow .22s ease}
@@ -193,6 +184,6 @@ h1{margin:0;font-family:"Songti SC","STSong",serif;font-size:clamp(34px,4vw,58px
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 14px;margin-top:24px}.field-grid label,.topic-field{display:flex;flex-direction:column;gap:7px}.field-grid label>span,.topic-field>span{font-size:12px;color:#5c6e67}.field-grid :deep(.ant-select){width:100%}.topic-field{margin-top:18px}
 .process-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:24px 0}.process-strip span{padding:12px 8px;border-top:1px solid #b9c4be;color:#52675f;font-size:11px}.process-strip b{display:block;margin-bottom:5px;color:#b45c36}
 .enter-button{margin-top:auto;border:0;background:#173e34;color:#fff;padding:15px 20px;font-weight:700;cursor:pointer;transition:.2s}.enter-button:hover{background:#245849;transform:translateY(-1px)}.enter-button:disabled{opacity:.6}
-@media(max-width:1300px){.scene-header{grid-template-columns:1fr}.back-button{order:-1}.scene-index{display:none}.scene-library{grid-template-columns:repeat(3,1fr)}.classroom-panel{grid-template-columns:minmax(0,1fr) 340px}.classroom-preview{min-height:520px}}
+@media(max-width:1300px){.scene-library{grid-template-columns:repeat(3,1fr)}.classroom-panel{grid-template-columns:minmax(0,1fr) 340px}.classroom-preview{min-height:520px}}
 @media(max-width:760px){.scene-page{padding:22px 14px 36px}.scene-library{grid-template-columns:1fr 1fr}.scene-card{min-height:132px;padding:14px}.scene-status{display:none}.classroom-panel{grid-template-columns:1fr}.classroom-preview{min-height:400px}.config-panel{padding:24px}.field-grid{grid-template-columns:1fr}h1{font-size:36px}}
 </style>

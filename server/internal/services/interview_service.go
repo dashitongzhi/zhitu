@@ -73,7 +73,8 @@ type CreateInterviewInput struct {
 	Mode           string `json:"mode"`
 }
 
-// Create 创建面试会话，并自动生成第一道题
+// Create 创建面试会话，并写入一道无需大模型的开场题。
+// 大模型只在用户开始作答后参与后续追问，不阻塞进入面试房间。
 func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateInterviewInput) (*models.Interview, error) {
 	if in.Scene != SceneTech && in.Scene != SceneBehavior && in.Scene != ScenePressure && in.Scene != SceneHR && in.Scene != SceneGroup && in.Scene != SceneTeaching {
 		return nil, errors.New("invalid scene, must be one of: tech/behavior/pressure/hr/group/teaching")
@@ -93,27 +94,42 @@ func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateIn
 
 	now := time.Now()
 	interview := &models.Interview{
-		UserID:         userID,
-		Scene:          in.Scene,
-		TargetCompany:  in.TargetCompany,
-		TargetPosition: in.TargetPosition,
-		TargetJD:       in.TargetJD,
-		Difficulty:     in.Difficulty,
-		TotalQuestions: in.TotalQuestions,
-		Mode:           in.Mode,
-		Status:         StatusOngoing,
-		StartedAt:      &now,
+		UserID:            userID,
+		Scene:             in.Scene,
+		TargetCompany:     in.TargetCompany,
+		TargetPosition:    in.TargetPosition,
+		TargetJD:          in.TargetJD,
+		Difficulty:        in.Difficulty,
+		TotalQuestions:    in.TotalQuestions,
+		Mode:              in.Mode,
+		Status:            StatusOngoing,
+		CurrentQuestionNo: 1,
+		StartedAt:         &now,
 	}
-	if err := s.db.Create(interview).Error; err != nil {
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(interview).Error; err != nil {
+			return err
+		}
+		firstQuestion := &models.InterviewMessage{
+			InterviewID:  interview.ID,
+			Role:         "assistant",
+			Content:      openingQuestion(interview),
+			QuestionType: "opening",
+			QuestionNo:   1,
+		}
+		return tx.Create(firstQuestion).Error
+	}); err != nil {
 		return nil, err
 	}
 
-	// 自动生成第一道题
-	if err := s.askNextQuestion(ctx, interview, 1); err != nil {
-		return nil, fmt.Errorf("generate first question: %w", err)
-	}
-
 	return interview, nil
+}
+
+func openingQuestion(interview *models.Interview) string {
+	if interview.Scene == SceneTeaching {
+		return fmt.Sprintf("欢迎进入模拟教室。请面向考官做一段简短的自我介绍，并说明你对%s课堂教学的理解。", interview.TargetPosition)
+	}
+	return fmt.Sprintf("欢迎参加本次面试。请先做一段简短的自我介绍，并说明你与%s岗位的匹配之处。", interview.TargetPosition)
 }
 
 // Get 获取面试详情（含所有消息）
