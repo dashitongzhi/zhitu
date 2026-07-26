@@ -46,7 +46,7 @@
     </a-layout-sider>
 
     <!-- 右侧布局 -->
-    <a-layout>
+    <a-layout class="main-layout">
       <!-- 顶部导航栏 -->
       <a-layout-header class="app-header">
         <div class="header-left">
@@ -158,6 +158,7 @@ const currentRouteTitle = computed(() => {
     ResumeTemplateSelect: '选择简历模板',
     ResumeEditor: '简历实验室',
     InterviewList: '面试训练场',
+    InterviewSceneSelect: '选择训练场景',
     InterviewRoom: '面试训练场',
     DeliveryKanban: '投递看板',
     ChangePassword: '修改密码',
@@ -200,6 +201,11 @@ const handleLogout = () => {
 <style scoped>
 .app-layout {
   min-height: 100vh;
+}
+
+.main-layout {
+  min-width: 0;
+  flex: 1 1 0;
 }
 
 .app-sider {
@@ -277,12 +283,23 @@ const handleLogout = () => {
 }
 
 .app-content {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: calc(100vw - 288px);
   margin: 24px;
   padding: 24px;
   background: #fff;
   border-radius: 8px;
   min-height: calc(100vh - 64px - 70px - 48px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 1100px) {
+  .app-content {
+    max-width: calc(100vw - 128px);
+    margin: 16px;
+    padding: 16px;
+  }
 }
 
 .app-content.editor-content {
