@@ -41,6 +41,33 @@
         </div>
       </div>
 
+      <section v-if="isTeachingScene" class="classroom-stage">
+        <div class="stage-meta">
+          <span>模拟教室</span>
+          <strong>{{ currentTeachingPhase }}</strong>
+          <small>第 {{ interviewStore.currentInterview?.current_question_no || 1 }} 环节</small>
+        </div>
+        <div class="examiner-bench">
+          <div class="examiner-person side"><i>考</i><span>学科考官</span></div>
+          <div class="examiner-person lead"><i>主</i><span>主考官</span></div>
+          <div class="examiner-person side"><i>记</i><span>记录员</span></div>
+        </div>
+        <div class="teaching-board">
+          <span>当前考题</span>
+          <p>{{ latestQuestion }}</p>
+          <div class="chalk-line"></div>
+        </div>
+        <div class="candidate-position">
+          <span>考生位置</span>
+          <strong>请面向考官开始作答</strong>
+        </div>
+        <div class="stage-timer">
+          <ClockCircleOutlined />
+          <span>本环节建议</span>
+          <strong>{{ teachingTimeHint }}</strong>
+        </div>
+      </section>
+
       <!-- 主体：左消息流 + 右信息/复盘 -->
       <a-row :gutter="16" class="room-body">
         <!-- 左侧消息流 -->
@@ -333,6 +360,7 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
   BulbOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import { useInterviewStore } from '@/stores/interview'
 import type {
@@ -377,6 +405,18 @@ const canPlayTts = computed(() => {
   const mode = interviewStore.currentInterview?.mode
   return mode === 'voice' || mode === 'hybrid'
 })
+const isTeachingScene = computed(() => interviewStore.currentInterview?.scene === 'teaching')
+const latestQuestion = computed(() => {
+  const assistantMessages = interviewStore.messages.filter((item) => item.role === 'assistant')
+  return assistantMessages[assistantMessages.length - 1]?.content || '考官正在准备第一道结构化问题…'
+})
+const currentTeachingPhase = computed(() => {
+  const no = interviewStore.currentInterview?.current_question_no || 1
+  if (no <= 2) return '结构化问答'
+  if (no <= 4) return '模拟试讲'
+  return '考官答辩'
+})
+const teachingTimeHint = computed(() => currentTeachingPhase.value === '模拟试讲' ? '8 分钟' : '2 分钟')
 
 // 显示的消息列表（隐藏流式时的临时占位）
 const displayMessages = computed(() => interviewStore.messages)
@@ -402,21 +442,41 @@ watch(
 // 场景
 const sceneLabel = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
+    teaching: '模拟教室',
+    corporate: '企业会议室',
+    group: '群面讨论室',
+    defense: '项目答辩室',
+    client: '客户会议室',
+    pressure: '压力面试室',
+    public: '结构化面试厅',
+    medical: '医疗面试室',
+    media: '媒体演播室',
+    remote: '远程面试间',
+    system: '系统设计室',
+    aviation: '航空面试厅',
     tech: '技术面',
     behavior: '行为面',
-    pressure: '压力面',
     hr: 'HR 面',
-    group: '群面',
   }
   return map[s] || s
 }
 const sceneColor = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
+    teaching: 'green',
+    corporate: 'blue',
+    group: 'orange',
+    defense: 'geekblue',
+    client: 'cyan',
+    pressure: 'red',
+    public: 'gold',
+    medical: 'green',
+    media: 'magenta',
+    remote: 'purple',
+    system: 'volcano',
+    aviation: 'lime',
     tech: 'blue',
     behavior: 'cyan',
-    pressure: 'red',
     hr: 'purple',
-    group: 'orange',
   }
   return map[s] || 'default'
 }
@@ -682,6 +742,162 @@ onMounted(async () => {
 
 .room-body {
   margin-bottom: 16px;
+}
+
+.classroom-stage {
+  position: relative;
+  min-height: 360px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border: 1px solid #bfcac3;
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.72), transparent 32%),
+    linear-gradient(#dfe7e1 0 69%, #b7875e 69% 72%, #caa77e 72%);
+  color: #173e34;
+  box-shadow: 0 16px 38px rgba(25, 55, 46, .1);
+}
+
+.stage-meta {
+  position: absolute;
+  z-index: 3;
+  top: 20px;
+  left: 22px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.stage-meta span,
+.stage-meta small {
+  font-size: 11px;
+  color: #667b73;
+}
+
+.stage-meta strong {
+  color: #b45c36;
+  font-size: 16px;
+}
+
+.examiner-bench {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 54px;
+  transform: translateX(-50%);
+}
+
+.examiner-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #587068;
+  font-size: 11px;
+}
+
+.examiner-person i {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #285347;
+  color: #fff;
+  font-style: normal;
+}
+
+.examiner-person.lead i {
+  background: #b45c36;
+}
+
+.teaching-board {
+  position: absolute;
+  top: 126px;
+  left: 15%;
+  right: 15%;
+  min-height: 142px;
+  padding: 22px 28px;
+  border: 10px solid #896547;
+  background: #173e34;
+  color: #eef2e8;
+  box-shadow: 0 12px 24px rgba(20, 46, 38, .18);
+}
+
+.teaching-board > span {
+  color: #9eb4a8;
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+
+.teaching-board p {
+  max-width: 900px;
+  margin: 12px 0;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.chalk-line {
+  width: 42%;
+  height: 1px;
+  background: #8da89a;
+}
+
+.candidate-position {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  min-width: 240px;
+  padding: 12px 20px;
+  transform: translateX(-50%);
+  background: #704c32;
+  color: #fff5e8;
+  text-align: center;
+  box-shadow: 0 10px 0 #543823;
+}
+
+.candidate-position span {
+  display: block;
+  color: #d4b99f;
+  font-size: 10px;
+}
+
+.candidate-position strong {
+  font-size: 12px;
+}
+
+.stage-timer {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 10px 14px;
+  background: rgba(249, 249, 244, .92);
+}
+
+.stage-timer .anticon {
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+.stage-timer span {
+  font-size: 10px;
+  color: #718079;
+}
+
+.stage-timer strong {
+  font-size: 15px;
+}
+
+@media (max-width: 760px) {
+  .classroom-stage { min-height: 410px; }
+  .examiner-bench { gap: 20px; }
+  .teaching-board { left: 5%; right: 5%; top: 136px; }
+  .stage-timer { right: 10px; bottom: 72px; }
 }
 
 .chat-card {

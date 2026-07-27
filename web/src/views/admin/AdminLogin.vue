@@ -2,8 +2,8 @@
   <div class="admin-login-container">
     <div class="login-card">
       <div class="login-header">
-        <img src="/favicon.svg" alt="职途AI" class="logo" />
-        <h1 class="title">职途AI 管理后台</h1>
+        <img src="/favicon.svg" alt="职途" class="logo" />
+        <h1 class="title">职途 管理后台</h1>
         <p class="subtitle">管理员登录</p>
       </div>
 

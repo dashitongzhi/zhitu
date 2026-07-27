@@ -3,8 +3,8 @@
     <div class="register-card">
       <!-- Logo 和标题 -->
       <div class="register-header">
-        <img src="/favicon.svg" alt="职途AI" class="logo" />
-        <h1 class="title">职途AI</h1>
+        <img src="/favicon.svg" alt="职途" class="logo" />
+        <h1 class="title">职途</h1>
         <p class="subtitle">创建您的账号</p>
       </div>
 

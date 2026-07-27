@@ -27,16 +27,33 @@ var (
 
 // 面试场景枚举
 const (
-	SceneTech     = "tech"
-	SceneBehavior = "behavior"
-	ScenePressure = "pressure"
-	SceneHR       = "hr"
-	SceneGroup    = "group"
+	SceneTech      = "tech"
+	SceneBehavior  = "behavior"
+	ScenePressure  = "pressure"
+	SceneHR        = "hr"
+	SceneGroup     = "group"
+	SceneTeaching  = "teaching"
+	SceneCorporate = "corporate"
+	SceneDefense   = "defense"
+	SceneClient    = "client"
+	ScenePublic    = "public"
+	SceneMedical   = "medical"
+	SceneMedia     = "media"
+	SceneRemote    = "remote"
+	SceneSystem    = "system"
+	SceneAviation  = "aviation"
 )
+
+var validInterviewScenes = map[string]struct{}{
+	SceneTech: {}, SceneBehavior: {}, ScenePressure: {}, SceneHR: {},
+	SceneGroup: {}, SceneTeaching: {}, SceneCorporate: {}, SceneDefense: {},
+	SceneClient: {}, ScenePublic: {}, SceneMedical: {}, SceneMedia: {},
+	SceneRemote: {}, SceneSystem: {}, SceneAviation: {},
+}
 
 // 面试状态枚举
 const (
-	StatusOngoing  = "ongoing"
+	StatusOngoing   = "ongoing"
 	StatusCompleted = "completed"
 	StatusCancelled = "cancelled"
 )
@@ -72,10 +89,11 @@ type CreateInterviewInput struct {
 	Mode           string `json:"mode"`
 }
 
-// Create 创建面试会话，并自动生成第一道题
+// Create 创建面试会话，并写入一道无需大模型的开场题。
+// 大模型只在用户开始作答后参与后续追问，不阻塞进入面试房间。
 func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateInterviewInput) (*models.Interview, error) {
-	if in.Scene != SceneTech && in.Scene != SceneBehavior && in.Scene != ScenePressure && in.Scene != SceneHR && in.Scene != SceneGroup {
-		return nil, errors.New("invalid scene, must be one of: tech/behavior/pressure/hr/group")
+	if _, ok := validInterviewScenes[in.Scene]; !ok {
+		return nil, errors.New("invalid interview scene")
 	}
 	if in.Difficulty == "" {
 		in.Difficulty = "mid"
@@ -92,27 +110,56 @@ func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateIn
 
 	now := time.Now()
 	interview := &models.Interview{
-		UserID:         userID,
-		Scene:          in.Scene,
-		TargetCompany:  in.TargetCompany,
-		TargetPosition: in.TargetPosition,
-		TargetJD:       in.TargetJD,
-		Difficulty:     in.Difficulty,
-		TotalQuestions: in.TotalQuestions,
-		Mode:           in.Mode,
-		Status:         StatusOngoing,
-		StartedAt:      &now,
+		UserID:            userID,
+		Scene:             in.Scene,
+		TargetCompany:     in.TargetCompany,
+		TargetPosition:    in.TargetPosition,
+		TargetJD:          in.TargetJD,
+		Difficulty:        in.Difficulty,
+		TotalQuestions:    in.TotalQuestions,
+		Mode:              in.Mode,
+		Status:            StatusOngoing,
+		CurrentQuestionNo: 1,
+		StartedAt:         &now,
 	}
-	if err := s.db.Create(interview).Error; err != nil {
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(interview).Error; err != nil {
+			return err
+		}
+		firstQuestion := &models.InterviewMessage{
+			InterviewID:  interview.ID,
+			Role:         "assistant",
+			Content:      openingQuestion(interview),
+			QuestionType: "opening",
+			QuestionNo:   1,
+		}
+		return tx.Create(firstQuestion).Error
+	}); err != nil {
 		return nil, err
 	}
 
-	// 自动生成第一道题
-	if err := s.askNextQuestion(ctx, interview, 1); err != nil {
-		return nil, fmt.Errorf("generate first question: %w", err)
-	}
-
 	return interview, nil
+}
+
+func openingQuestion(interview *models.Interview) string {
+	questions := map[string]string{
+		SceneTeaching:  "欢迎进入模拟教室。请面向考官做一段简短的自我介绍，并说明你对%s课堂教学的理解。",
+		SceneCorporate: "欢迎进入企业会议室。请简要介绍自己，并选择一段最能证明你胜任%s的经历。",
+		SceneGroup:     "欢迎进入群面讨论室。请用一分钟陈述你对讨论目标的理解，以及你准备承担的团队角色。",
+		SceneDefense:   "欢迎进入项目答辩室。请先概述与你申请的%s最相关的项目背景、职责和成果。",
+		SceneClient:    "欢迎进入客户会议室。假设客户首次与你见面，请围绕%s做一段简洁、有说服力的价值介绍。",
+		ScenePressure:  "欢迎进入压力面试室。请直面回答：与其他候选人相比，我们为什么应该选择你担任%s？",
+		ScenePublic:    "欢迎进入结构化面试厅。请结合%s的职责，谈谈你如何看待服务意识与执行能力。",
+		SceneMedical:   "欢迎进入医疗面试室。请结合%s岗位，说明你如何兼顾专业判断、患者感受与沟通效率。",
+		SceneMedia:     "欢迎进入媒体演播室。请面向镜头完成一分钟自我介绍，并说明你应聘%s的核心优势。",
+		SceneRemote:    "欢迎进入远程面试间。请用清晰简洁的方式介绍自己，并说明你胜任%s和远程协作的优势。",
+		SceneSystem:    "欢迎进入系统设计室。请先说明你在%s相关工作中如何进行需求澄清与技术方案取舍。",
+		SceneAviation:  "欢迎进入航空面试厅。请结合%s岗位，介绍一次你主动提供优质服务或处理突发情况的经历。",
+	}
+	if question, ok := questions[interview.Scene]; ok {
+		return fmt.Sprintf(question, interview.TargetPosition)
+	}
+	return fmt.Sprintf("欢迎参加本次面试。请先做一段简短的自我介绍，并说明你与%s岗位的匹配之处。", interview.TargetPosition)
 }
 
 // Get 获取面试详情（含所有消息）
@@ -299,8 +346,8 @@ func (s *InterviewService) endAndGenerateReport(ctx context.Context, interview *
 	interview.Status = StatusCompleted
 	interview.EndedAt = &now
 	if err := s.db.Model(interview).Updates(map[string]interface{}{
-		"status":    StatusCompleted,
-		"ended_at":  now,
+		"status":   StatusCompleted,
+		"ended_at": now,
 	}).Error; err != nil {
 		return err
 	}
@@ -398,11 +445,21 @@ func (s *InterviewService) askNextQuestionWithStream(ctx context.Context, interv
 // buildInterviewerPrompt 构造面试官 system prompt
 func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, questionNo int, profileSummary string) string {
 	sceneDesc := map[string]string{
-		SceneTech:     "技术面（算法、项目深挖、系统设计）",
-		SceneBehavior: "行为面（STAR 法则）",
-		ScenePressure: "压力面（挑战性/陷阱题）",
-		SceneHR:       "HR 面（薪资/规划/离职原因）",
-		SceneGroup:    "群面模拟（多角色讨论）",
+		SceneTech:      "技术面（算法、项目深挖、系统设计）",
+		SceneBehavior:  "行为面（STAR 法则）",
+		ScenePressure:  "压力面（挑战性/陷阱题）",
+		SceneHR:        "HR 面（薪资/规划/离职原因）",
+		SceneGroup:     "群面模拟（多角色讨论）",
+		SceneTeaching:  "教资模拟教室（结构化问答、模拟试讲、考官答辩）",
+		SceneCorporate: "企业会议室（经历深挖、岗位匹配）",
+		SceneDefense:   "项目答辩室（项目陈述、关键追问）",
+		SceneClient:    "客户会议室（需求理解、方案表达、异议处理）",
+		ScenePublic:    "结构化面试厅（综合分析、组织管理、应急应变）",
+		SceneMedical:   "医疗面试室（专业判断、医患沟通）",
+		SceneMedia:     "媒体演播室（镜头表达、即兴回应）",
+		SceneRemote:    "远程面试间（视频沟通、英文表达）",
+		SceneSystem:    "系统设计室（需求澄清、架构设计、方案权衡）",
+		SceneAviation:  "航空面试厅（服务意识、情景处置、职业仪态）",
 	}[interview.Scene]
 
 	diffDesc := map[string]string{
@@ -423,6 +480,7 @@ func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, q
 3. 结合以下 JD 关键词出题
 4. 难度递增
 5. 模拟真实面试官语气，不要透露你是 AI
+6. 如果是教资模拟教室：前两题进行结构化问答，中间两题要求候选人围绕抽题主题完成试讲片段，最后一题以考官身份针对教学设计进行答辩追问
 
 企业风格提示：根据你对 %s 面试风格的了解调整出题策略（如字节跳动注重底层原理与项目深挖，阿里注重系统设计，腾讯注重技术广度等；若不确定则按通用标准）。
 
@@ -578,7 +636,7 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 	}
 
 	var reportData struct {
-		Summary         string `json:"summary"`
+		Summary         string   `json:"summary"`
 		Highlights      []string `json:"highlights"`
 		Improvements    []string `json:"improvements"`
 		Recommendations []string `json:"recommendations"`
@@ -616,6 +674,7 @@ func calcOverallScore(scores []models.InterviewScore, scene string) int {
 		ScenePressure: {"professional": 0.2, "expression": 0.15, "logic": 0.25, "adaptability": 0.35, "pace": 0.05},
 		SceneHR:       {"professional": 0.1, "expression": 0.3, "logic": 0.15, "adaptability": 0.2, "pace": 0.25},
 		SceneGroup:    {"professional": 0.2, "expression": 0.25, "logic": 0.15, "adaptability": 0.3, "pace": 0.1},
+		SceneTeaching: {"professional": 0.3, "expression": 0.25, "logic": 0.15, "adaptability": 0.2, "pace": 0.1},
 	}[scene]
 	if weights == nil {
 		weights = map[string]float64{"professional": 0.25, "expression": 0.2, "logic": 0.2, "adaptability": 0.2, "pace": 0.15}

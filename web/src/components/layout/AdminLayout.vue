@@ -9,8 +9,8 @@
       theme="dark"
     >
       <div class="logo">
-        <img src="/favicon.svg" alt="职途AI" class="logo-icon" />
-        <span v-show="!collapsed" class="logo-text">职途AI管理</span>
+        <img src="/favicon.svg" alt="职途" class="logo-icon" />
+        <span v-show="!collapsed" class="logo-text">职途管理</span>
       </div>
 
       <a-menu
@@ -66,7 +66,7 @@
       </a-layout-content>
 
       <a-layout-footer class="admin-footer">
-        职途AI 管理后台 © 2024
+        职途 管理后台 © 2026
       </a-layout-footer>
     </a-layout>
   </a-layout>

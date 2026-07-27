@@ -1,4 +1,4 @@
-// Package main 是职途AI 后端的入口
+// Package main 是职途 后端的入口
 package main
 
 import (

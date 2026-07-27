@@ -95,7 +95,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	})
 }
 
-// Login 普通用户登录
+// Login 用户登录。
+// 配置中的管理员凭据也可以从统一登录入口进入产品工作台，
+// 同时保留 /api/auth/admin/login 供独立管理后台使用。
 // POST /api/auth/login
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginReq
@@ -106,7 +108,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user, err := h.auth.Login(req.Email, req.Password)
 	if err != nil {
-		utils.Unauthorized(c, err.Error())
+		adminEmail, adminErr := h.auth.AdminLogin(req.Email, req.Password)
+		if adminErr != nil {
+			utils.Unauthorized(c, err.Error())
+			return
+		}
+
+		token, tokenErr := h.jwt.GenerateForAdmin(adminEmail)
+		if tokenErr != nil {
+			utils.InternalError(c, "generate token failed")
+			return
+		}
+
+		utils.OKWithMsg(c, "admin login success", tokenResp{
+			Token:     token,
+			TokenType: "Bearer",
+			ExpiresIn: h.jwt.TTLSeconds(),
+		})
 		return
 	}
 

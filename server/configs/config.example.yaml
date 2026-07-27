@@ -1,4 +1,4 @@
-# 职途AI 后端配置文件
+# 职途 后端配置文件
 # 修改后需重启服务生效
 
 server:
@@ -21,16 +21,18 @@ database:
 jwt:
   # JWT 签名密钥，生产环境务必修改为强随机字符串
   secret: "please-change-this-to-a-strong-random-secret"
+  # 管理员 Token 使用独立签名密钥
+  admin_secret: "please-change-this-admin-secret"
   # JWT 签发者
   issuer: "zhitu"
   # Token 有效期（小时），7 天 = 168
   expire_hours: 168
 
-# 后台管理员凭据 —— 直接写在此处，不在数据库中维护
-# 管理员登录走 /api/auth/admin/login，普通用户登录走 /api/auth/login
+# 管理员凭据 —— 直接写在此处，不在数据库中维护
+# 可从首页统一登录入口进入产品工作台，也可从 /admin/login 进入管理后台
 admin:
   email: "admin@zhitu.com"
-  password: "admin@zhitu.com"
+  password: "admin123456"
 
 # LLM 接口配置（OpenAI 兼容，可替换为 DeepSeek/智谱/Moonshot 等）
 # base_url 末尾不要带斜杠；不同 provider 的路径后缀由代码自动拼接
