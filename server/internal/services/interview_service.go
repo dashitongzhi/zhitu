@@ -27,13 +27,29 @@ var (
 
 // 面试场景枚举
 const (
-	SceneTech     = "tech"
-	SceneBehavior = "behavior"
-	ScenePressure = "pressure"
-	SceneHR       = "hr"
-	SceneGroup    = "group"
-	SceneTeaching = "teaching"
+	SceneTech      = "tech"
+	SceneBehavior  = "behavior"
+	ScenePressure  = "pressure"
+	SceneHR        = "hr"
+	SceneGroup     = "group"
+	SceneTeaching  = "teaching"
+	SceneCorporate = "corporate"
+	SceneDefense   = "defense"
+	SceneClient    = "client"
+	ScenePublic    = "public"
+	SceneMedical   = "medical"
+	SceneMedia     = "media"
+	SceneRemote    = "remote"
+	SceneSystem    = "system"
+	SceneAviation  = "aviation"
 )
+
+var validInterviewScenes = map[string]struct{}{
+	SceneTech: {}, SceneBehavior: {}, ScenePressure: {}, SceneHR: {},
+	SceneGroup: {}, SceneTeaching: {}, SceneCorporate: {}, SceneDefense: {},
+	SceneClient: {}, ScenePublic: {}, SceneMedical: {}, SceneMedia: {},
+	SceneRemote: {}, SceneSystem: {}, SceneAviation: {},
+}
 
 // 面试状态枚举
 const (
@@ -76,8 +92,8 @@ type CreateInterviewInput struct {
 // Create 创建面试会话，并写入一道无需大模型的开场题。
 // 大模型只在用户开始作答后参与后续追问，不阻塞进入面试房间。
 func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateInterviewInput) (*models.Interview, error) {
-	if in.Scene != SceneTech && in.Scene != SceneBehavior && in.Scene != ScenePressure && in.Scene != SceneHR && in.Scene != SceneGroup && in.Scene != SceneTeaching {
-		return nil, errors.New("invalid scene, must be one of: tech/behavior/pressure/hr/group/teaching")
+	if _, ok := validInterviewScenes[in.Scene]; !ok {
+		return nil, errors.New("invalid interview scene")
 	}
 	if in.Difficulty == "" {
 		in.Difficulty = "mid"
@@ -126,8 +142,22 @@ func (s *InterviewService) Create(ctx context.Context, userID uint, in *CreateIn
 }
 
 func openingQuestion(interview *models.Interview) string {
-	if interview.Scene == SceneTeaching {
-		return fmt.Sprintf("欢迎进入模拟教室。请面向考官做一段简短的自我介绍，并说明你对%s课堂教学的理解。", interview.TargetPosition)
+	questions := map[string]string{
+		SceneTeaching:  "欢迎进入模拟教室。请面向考官做一段简短的自我介绍，并说明你对%s课堂教学的理解。",
+		SceneCorporate: "欢迎进入企业会议室。请简要介绍自己，并选择一段最能证明你胜任%s的经历。",
+		SceneGroup:     "欢迎进入群面讨论室。请用一分钟陈述你对讨论目标的理解，以及你准备承担的团队角色。",
+		SceneDefense:   "欢迎进入项目答辩室。请先概述与你申请的%s最相关的项目背景、职责和成果。",
+		SceneClient:    "欢迎进入客户会议室。假设客户首次与你见面，请围绕%s做一段简洁、有说服力的价值介绍。",
+		ScenePressure:  "欢迎进入压力面试室。请直面回答：与其他候选人相比，我们为什么应该选择你担任%s？",
+		ScenePublic:    "欢迎进入结构化面试厅。请结合%s的职责，谈谈你如何看待服务意识与执行能力。",
+		SceneMedical:   "欢迎进入医疗面试室。请结合%s岗位，说明你如何兼顾专业判断、患者感受与沟通效率。",
+		SceneMedia:     "欢迎进入媒体演播室。请面向镜头完成一分钟自我介绍，并说明你应聘%s的核心优势。",
+		SceneRemote:    "欢迎进入远程面试间。请用清晰简洁的方式介绍自己，并说明你胜任%s和远程协作的优势。",
+		SceneSystem:    "欢迎进入系统设计室。请先说明你在%s相关工作中如何进行需求澄清与技术方案取舍。",
+		SceneAviation:  "欢迎进入航空面试厅。请结合%s岗位，介绍一次你主动提供优质服务或处理突发情况的经历。",
+	}
+	if question, ok := questions[interview.Scene]; ok {
+		return fmt.Sprintf(question, interview.TargetPosition)
 	}
 	return fmt.Sprintf("欢迎参加本次面试。请先做一段简短的自我介绍，并说明你与%s岗位的匹配之处。", interview.TargetPosition)
 }
@@ -415,12 +445,21 @@ func (s *InterviewService) askNextQuestionWithStream(ctx context.Context, interv
 // buildInterviewerPrompt 构造面试官 system prompt
 func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, questionNo int, profileSummary string) string {
 	sceneDesc := map[string]string{
-		SceneTech:     "技术面（算法、项目深挖、系统设计）",
-		SceneBehavior: "行为面（STAR 法则）",
-		ScenePressure: "压力面（挑战性/陷阱题）",
-		SceneHR:       "HR 面（薪资/规划/离职原因）",
-		SceneGroup:    "群面模拟（多角色讨论）",
-		SceneTeaching: "教资模拟教室（结构化问答、模拟试讲、考官答辩）",
+		SceneTech:      "技术面（算法、项目深挖、系统设计）",
+		SceneBehavior:  "行为面（STAR 法则）",
+		ScenePressure:  "压力面（挑战性/陷阱题）",
+		SceneHR:        "HR 面（薪资/规划/离职原因）",
+		SceneGroup:     "群面模拟（多角色讨论）",
+		SceneTeaching:  "教资模拟教室（结构化问答、模拟试讲、考官答辩）",
+		SceneCorporate: "企业会议室（经历深挖、岗位匹配）",
+		SceneDefense:   "项目答辩室（项目陈述、关键追问）",
+		SceneClient:    "客户会议室（需求理解、方案表达、异议处理）",
+		ScenePublic:    "结构化面试厅（综合分析、组织管理、应急应变）",
+		SceneMedical:   "医疗面试室（专业判断、医患沟通）",
+		SceneMedia:     "媒体演播室（镜头表达、即兴回应）",
+		SceneRemote:    "远程面试间（视频沟通、英文表达）",
+		SceneSystem:    "系统设计室（需求澄清、架构设计、方案权衡）",
+		SceneAviation:  "航空面试厅（服务意识、情景处置、职业仪态）",
 	}[interview.Scene]
 
 	diffDesc := map[string]string{

@@ -443,22 +443,40 @@ watch(
 const sceneLabel = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
     teaching: '模拟教室',
+    corporate: '企业会议室',
+    group: '群面讨论室',
+    defense: '项目答辩室',
+    client: '客户会议室',
+    pressure: '压力面试室',
+    public: '结构化面试厅',
+    medical: '医疗面试室',
+    media: '媒体演播室',
+    remote: '远程面试间',
+    system: '系统设计室',
+    aviation: '航空面试厅',
     tech: '技术面',
     behavior: '行为面',
-    pressure: '压力面',
     hr: 'HR 面',
-    group: '群面',
   }
   return map[s] || s
 }
 const sceneColor = (s: InterviewScene | string): string => {
   const map: Record<string, string> = {
     teaching: 'green',
+    corporate: 'blue',
+    group: 'orange',
+    defense: 'geekblue',
+    client: 'cyan',
+    pressure: 'red',
+    public: 'gold',
+    medical: 'green',
+    media: 'magenta',
+    remote: 'purple',
+    system: 'volcano',
+    aviation: 'lime',
     tech: 'blue',
     behavior: 'cyan',
-    pressure: 'red',
     hr: 'purple',
-    group: 'orange',
   }
   return map[s] || 'default'
 }
