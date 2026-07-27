@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAdminAuthStore } from '@/stores/admin'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import AppLayoutPreview from '@/components/layout/AppLayoutPreview.vue'
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 
 // 路由配置
@@ -40,6 +41,60 @@ const routes: RouteRecordRaw[] = [
     name: 'ResumeLabPreview',
     component: () => import('@/views/ResumeEditor.vue'),
     meta: { requiresAuth: false, isPublic: false },
+  },
+  // 现有产品的视觉统一预览：复用原业务内容，只替换复制后的布局外壳
+  {
+    path: '/app-style-preview',
+    component: AppLayoutPreview,
+    meta: { requiresAuth: false },
+    children: [
+      {
+        path: '',
+        redirect: '/app-style-preview/resumes',
+      },
+      {
+        path: 'resumes',
+        name: 'PreviewResumeList',
+        component: () => import('@/views/ResumeList.vue'),
+      },
+      {
+        path: 'resumes/new',
+        name: 'PreviewResumeTemplateSelect',
+        component: () => import('@/views/ResumeTemplateSelect.vue'),
+      },
+      {
+        path: 'resumes/:id',
+        name: 'PreviewResumeEditor',
+        component: () => import('@/views/ResumeEditor.vue'),
+        props: true,
+      },
+      {
+        path: 'interviews',
+        name: 'PreviewInterviewList',
+        component: () => import('@/views/InterviewList.vue'),
+      },
+      {
+        path: 'interviews/new',
+        name: 'PreviewInterviewSceneSelect',
+        component: () => import('@/views/InterviewSceneSelect.vue'),
+      },
+      {
+        path: 'interviews/:id',
+        name: 'PreviewInterviewRoom',
+        component: () => import('@/views/InterviewRoom.vue'),
+        props: true,
+      },
+      {
+        path: 'deliveries',
+        name: 'PreviewDeliveryKanban',
+        component: () => import('@/views/DeliveryKanban.vue'),
+      },
+      {
+        path: 'settings/password',
+        name: 'PreviewChangePassword',
+        component: () => import('@/views/Settings/ChangePassword.vue'),
+      },
+    ],
   },
   // 管理端路由
   {
