@@ -1,18 +1,7 @@
 <template>
   <div class="template-page">
     <header class="template-header">
-      <div>
-        <button class="back-link" type="button" @click="router.push('/app/resumes')">
-          <ArrowLeftOutlined /> 返回简历实验室
-        </button>
-        <p class="step-label">创建简历 · 第 1 步</p>
-        <h1>先选择一张适合你的模板</h1>
-        <p class="header-copy">模板只改变排版，不锁定内容。进入编辑器后，所有栏目都可以自由填写、隐藏和实时预览。</p>
-      </div>
-      <div class="header-note">
-        <SafetyCertificateOutlined />
-        <span><strong>文本化模板</strong><small>没有图片切片，导出更清晰，也更利于 ATS 识别</small></span>
-      </div>
+      <h1>选择合适的简历模板</h1>
     </header>
 
     <div class="filter-row" aria-label="模板说明">
@@ -71,10 +60,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
-  ArrowLeftOutlined,
   ArrowRightOutlined,
   LoadingOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons-vue'
 import { createTemplateContent, resumeTemplates, type ResumeTemplate } from '@/data/resumeTemplates'
 import { useResumeStore } from '@/stores/resume'
@@ -110,55 +97,17 @@ const createFromTemplate = async (template: ResumeTemplate) => {
   color: var(--ink);
 }
 .template-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  align-items: end;
-  gap: 48px;
-  padding: 12px 0 32px;
+  padding: 0 0 18px;
   border-bottom: 1px solid #dfe5e1;
-}
-.back-link {
-  margin: 0 0 28px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #5e6a64;
-  cursor: pointer;
-  font-size: 13px;
-}
-.back-link:hover { color: var(--green); }
-.step-label {
-  margin: 0 0 8px;
-  color: var(--green);
-  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: .12em;
 }
 .template-header h1 {
   margin: 0;
   font-family: 'Songti SC', 'Noto Serif SC', serif;
-  font-size: clamp(34px, 4vw, 54px);
-  font-weight: 650;
-  letter-spacing: -.045em;
-  line-height: 1.08;
+  font-size: clamp(38px, 4.2vw, 64px);
+  font-weight: 600;
+  letter-spacing: -.04em;
+  line-height: 1.12;
 }
-.header-copy {
-  max-width: 680px;
-  margin: 15px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.75;
-}
-.header-note {
-  display: flex;
-  gap: 12px;
-  padding: 18px 20px;
-  border-left: 3px solid var(--green);
-  background: #f1f6f3;
-}
-.header-note > :deep(.anticon) { margin-top: 2px; color: var(--green); font-size: 19px; }
-.header-note span { display: flex; flex-direction: column; gap: 4px; }
-.header-note strong { font-size: 13px; }
-.header-note small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .filter-row {
   display: flex;
   align-items: center;
@@ -272,7 +221,7 @@ const createFromTemplate = async (template: ResumeTemplate) => {
 .template-meta p { min-height: 39px; margin: 7px 0 6px; color: var(--muted); font-size: 10.5px; line-height: 1.55; }
 .template-meta small { color: var(--green); font-size: 9.5px; font-weight: 700; }
 @media (max-width: 1250px) { .template-grid { grid-template-columns: repeat(4, minmax(170px, 1fr)); } }
-@media (max-width: 980px) { .template-header { grid-template-columns: 1fr; gap: 22px; } .header-note { max-width: 520px; } .template-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); } }
-@media (max-width: 680px) { .template-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 24px 14px; } .template-header h1 { font-size: 34px; } .header-note { display: none; } }
+@media (max-width: 980px) { .template-grid { grid-template-columns: repeat(3, minmax(160px, 1fr)); } }
+@media (max-width: 680px) { .template-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 24px 14px; } .template-header h1 { font-size: 34px; } }
 @media (max-width: 420px) { .template-grid { grid-template-columns: 1fr; } .paper-frame { max-width: 250px; margin-inline: auto; } }
 </style>
