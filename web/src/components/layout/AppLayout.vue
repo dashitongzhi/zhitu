@@ -1,18 +1,18 @@
 <template>
-  <a-layout class="app-layout">
+  <a-layout class="app-layout unified-layout">
     <!-- 侧边栏 -->
     <a-layout-sider
       v-model:collapsed="collapsed"
       collapsible
-      :width="240"
-      :collapsed-width="80"
+      :width="224"
+      :collapsed-width="76"
       :trigger="null"
       class="app-sider"
       theme="light"
     >
       <!-- Logo 区域 -->
       <div class="logo">
-        <img src="/favicon.svg" alt="职途" class="logo-icon" />
+        <span class="logo-icon unified-brand-mark" aria-hidden="true">职</span>
         <span v-show="!collapsed" class="logo-text">职途</span>
       </div>
 
@@ -219,20 +219,39 @@ const handleLogout = () => {
 
 <style scoped>
 .app-layout {
+  --primary: #1757d2;
+  --brand-50: #edf2ff;
+  --brand-500: #1757d2;
+  --brand-600: #0d47bb;
+  --background-50: #ffffff;
+  --background-100: #f4f5f2;
+  --background-200: #eceeeb;
+  --background-300: #d8dce1;
+  --foreground: #151a23;
+  --muted-foreground: #68717e;
+  --border: #d8dce1;
+  --card: #ffffff;
+  --radius: 0.5rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
   min-height: 100vh;
-  background: var(--background-100);
+  background: #f4f5f2;
 }
 
 .main-layout {
   min-width: 0;
   flex: 1 1 0;
-  background: var(--background-100);
+  background: #f4f5f2;
 }
 
 /* ===== 侧边栏：Pinguo 设计稿对齐 ===== */
 .app-sider {
-  background: var(--sidebar) !important;
-  border-right: 1px solid var(--sidebar-border);
+  background: #f0f1ee !important;
+  border-right: 1px solid #d8dce1;
   box-shadow: none !important;
   z-index: 10;
   position: sticky !important;
@@ -244,26 +263,34 @@ const handleLogout = () => {
 .app-sider :deep(.ant-layout-sider-children) {
   display: flex;
   flex-direction: column;
-  padding: 0 14px 6px;
+  padding: 0 14px 10px;
 }
 
 .logo {
-  height: 64px;
+  height: 72px;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 8px;
-  border-bottom: 1px solid var(--sidebar-border);
+  border-bottom: 1px solid #d7dbdf;
   justify-content: flex-start;
 }
 
 .logo-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: var(--primary);
-  padding: 7px;
-  box-shadow: var(--shadow-sm);
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #151a23;
+  padding: 0;
+  box-shadow: none;
+}
+
+.unified-brand-mark {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .logo-text {
@@ -283,7 +310,8 @@ const handleLogout = () => {
 }
 
 .app-sider :deep(.ant-menu-item) {
-  border-radius: 10px;
+  min-height: 50px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   color: var(--sidebar-foreground);
@@ -297,9 +325,9 @@ const handleLogout = () => {
 }
 
 .app-sider :deep(.ant-menu-item-selected) {
-  background: var(--background) !important;
+  background: rgba(255, 255, 255, 0.66) !important;
   color: var(--primary) !important;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .app-sider :deep(.ant-menu-item-selected::after) {
@@ -313,8 +341,8 @@ const handleLogout = () => {
 /* ===== 自定义折叠按钮（仿菜单项样式） ===== */
 .sider-footer {
   margin-top: auto;
-  padding: 14px 14px 6px;
-  border-top: 1px solid var(--sidebar-border);
+  padding: 14px 4px 6px;
+  border-top: 1px solid #d7dbdf;
 }
 .collapse-btn {
   width: 100%;
@@ -324,7 +352,7 @@ const handleLogout = () => {
   gap: 11px;
   padding: 0 11px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--sidebar-foreground);
   font-size: 14px;
@@ -372,12 +400,12 @@ const handleLogout = () => {
 
 /* ===== 顶部栏 ===== */
 .app-header {
-  background: var(--background);
-  padding: 0 24px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid #d8dce1;
   box-shadow: none;
   height: 64px;
   z-index: 9;
@@ -418,7 +446,7 @@ const handleLogout = () => {
   align-items: center;
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 980px;
+  border-radius: 8px;
   transition: background-color 0.18s ease;
   gap: 10px;
 }
@@ -432,8 +460,9 @@ const handleLogout = () => {
 }
 
 .avatar {
-  background-color: var(--primary) !important;
-  color: var(--primary-foreground) !important;
+  border-radius: 8px !important;
+  background-color: var(--brand-50) !important;
+  color: var(--primary) !important;
   font-size: 13px;
   font-weight: 600;
 }
@@ -456,13 +485,230 @@ const handleLogout = () => {
   box-sizing: border-box;
   min-width: 0;
   width: auto;
-  margin: 24px;
-  padding: 24px;
-  background: var(--card);
-  border-radius: 16px;
-  border: 1px solid var(--border);
+  margin: 26px 30px 40px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border: 0;
   min-height: calc(100vh - 64px - 48px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+}
+
+/* ===== 复制版主题桥接：只覆盖现有业务组件的视觉，不改变结构或内容 ===== */
+.unified-layout :deep(.page-header) {
+  margin-bottom: 30px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.unified-layout :deep(.page-title) {
+  color: var(--foreground);
+  font-size: 32px;
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+.unified-layout :deep(.page-subtitle) {
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.unified-layout :deep(.btn-create),
+.unified-layout :deep(.new-btn),
+.unified-layout :deep(.btn-primary-capsule),
+.unified-layout :deep(.export-button),
+.unified-layout :deep(.action-btn) {
+  border-radius: 6px !important;
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.btn-secondary-capsule),
+.unified-layout :deep(.ant-btn),
+.unified-layout :deep(.toolbar-select),
+.unified-layout :deep(.zoom-control) {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.resume-card),
+.unified-layout :deep(.table-card),
+.unified-layout :deep(.stat-card),
+.unified-layout :deep(.platform-card),
+.unified-layout :deep(.platform-hero-card),
+.unified-layout :deep(.kb-table-card),
+.unified-layout :deep(.kb-mobile-card),
+.unified-layout :deep(.editor-panel),
+.unified-layout :deep(.dim-card),
+.unified-layout :deep(.strategy-card),
+.unified-layout :deep(.ant-card),
+.unified-layout :deep(.ant-table-wrapper) {
+  border-radius: 8px !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.resume-card:hover),
+.unified-layout :deep(.stat-card:hover),
+.unified-layout :deep(.kb-mobile-card:hover) {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: #aeb5bf !important;
+}
+
+.unified-layout :deep(.ant-input),
+.unified-layout :deep(.ant-input-affix-wrapper),
+.unified-layout :deep(.ant-input-password),
+.unified-layout :deep(.ant-picker),
+.unified-layout :deep(.ant-select-selector) {
+  border-radius: 6px !important;
+}
+
+.unified-layout :deep(.ant-tag),
+.unified-layout :deep(.status-tag),
+.unified-layout :deep(.scene-tag),
+.unified-layout :deep(.mode-tag) {
+  border-radius: 999px !important;
+}
+
+.unified-layout :deep(.qc-input-wrap),
+.unified-layout :deep(.search-wrap),
+.unified-layout :deep(.filter-select),
+.unified-layout :deep(.view-toggle-group),
+.unified-layout :deep(.empty-state) {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.stat-grid) {
+  gap: 0 !important;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.unified-layout :deep(.stat-card) {
+  border: 0 !important;
+  border-right: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.unified-layout :deep(.stat-card:last-child) {
+  border-right: 0 !important;
+}
+
+.unified-layout :deep(.stat-icon-wrap) {
+  background: var(--brand-50) !important;
+  color: var(--primary) !important;
+}
+
+.unified-layout :deep(.stat-spark polyline) {
+  stroke: var(--primary) !important;
+}
+
+.unified-layout :deep(.view-toggle-btn) {
+  border-radius: 6px !important;
+}
+
+/* 简历模板：保留模板内容，只统一页面标题、品牌色与交互表面 */
+.unified-layout :deep(.template-page) {
+  --ink: var(--foreground);
+  --muted: var(--muted-foreground);
+  --green: var(--primary);
+}
+
+.unified-layout :deep(.template-header) {
+  padding-bottom: 22px;
+  border-color: var(--border);
+}
+
+.unified-layout :deep(.template-header h1) {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 720;
+  letter-spacing: -0.045em;
+}
+
+.unified-layout :deep(.paper-frame) {
+  border-color: var(--border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.unified-layout :deep(.template-card:hover .paper-frame),
+.unified-layout :deep(.template-card:focus-visible .paper-frame) {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: none;
+}
+
+/* 简历编辑器：操作按钮小圆角，信息面板保持轻边框 */
+.unified-layout :deep(.add-item),
+.unified-layout :deep(.mini-btn),
+.unified-layout :deep(.opt-btn),
+.unified-layout :deep(.link-btn) {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.smart-tabs),
+.unified-layout :deep(.score-overview),
+.unified-layout :deep(.repeat-item),
+.unified-layout :deep(.jd-result),
+.unified-layout :deep(.jd-empty),
+.unified-layout :deep(.opt-section) {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+/* 面试场景：保留场景图片与教学空间，只统一选择态和容器语言 */
+.unified-layout :deep(.scene-card),
+.unified-layout :deep(.classroom-panel),
+.unified-layout :deep(.room-header),
+.unified-layout :deep(.classroom-stage) {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.scene-card:hover),
+.unified-layout :deep(.scene-card.selected) {
+  transform: translateY(-2px);
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.scene-card.selected) {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: -2px !important;
+}
+
+.unified-layout :deep(.scene-status),
+.unified-layout :deep(.scene-number) {
+  border-radius: 4px;
+}
+
+.unified-layout :deep(.scene-status),
+.unified-layout :deep(.process-strip b) {
+  color: var(--primary);
+}
+
+.unified-layout :deep(.scene-status) {
+  background: var(--primary);
+  color: #fff;
+}
+
+.unified-layout :deep(.enter-button) {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.unified-layout :deep(.candidate-position),
+.unified-layout :deep(.stage-timer) {
+  border-radius: 6px;
 }
 
 @media (max-width: 1100px) {

@@ -13,23 +13,23 @@
 :root {
   /* ===== PRIMITIVE PALETTE ===== */
   /* brand */
-  --brand-50: #e8f2ff;
-  --brand-100: #cfe5ff;
-  --brand-200: #9fcbff;
-  --brand-300: #66abff;
-  --brand-400: #2e8dff;
-  --brand-500: #007aff; /* @primary */
-  --brand-600: #0064d6;
-  --brand-700: #004fad;
-  --brand-800: #003b82;
-  --brand-900: #00275a;
+  --brand-50: #edf2ff;
+  --brand-100: #dce7ff;
+  --brand-200: #b8ccff;
+  --brand-300: #88aaff;
+  --brand-400: #4f7ee8;
+  --brand-500: #1757d2; /* @primary */
+  --brand-600: #0d47bb;
+  --brand-700: #093a9a;
+  --brand-800: #082f78;
+  --brand-900: #071f4f;
 
   /* background */
   --background-50: #ffffff;
-  --background-100: #f7f7fa;
-  --background-200: #f2f2f7;
-  --background-300: #e5e5ea;
-  --background-400: #d1d1d6;
+  --background-100: #f4f5f2;
+  --background-200: #eceeeb;
+  --background-300: #d8dce1;
+  --background-400: #bdc3ca;
   --background-500: #aeaeb2;
   --background-600: #8e8e93;
   --background-700: #3a3a3c;
@@ -45,7 +45,7 @@
   --text-500: #6e6e73;
   --text-600: #48484a;
   --text-700: #3c3c43;
-  --text-800: #1d1d1f;
+  --text-800: #151a23;
   --text-900: #000000;
 
   /* icon */
@@ -132,20 +132,20 @@
   --tracking-normal: 0em;
 
   /* RADIUS */
-  --radius: 1.2rem;
+  --radius: 0.5rem;
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
 
   /* SHADOWS - light */
-  --shadow-2xs: 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.05);
-  --shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.08), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 16px 40px -10px rgba(0, 0, 0, 0.10), 0 8px 16px -8px rgba(0, 0, 0, 0.06);
-  --shadow-2xl: 0 24px 64px -12px rgba(0, 0, 0, 0.12);
+  --shadow-2xs: 0 1px 2px -1px rgba(21, 26, 35, 0.03);
+  --shadow-xs: 0 1px 2px rgba(21, 26, 35, 0.03);
+  --shadow-sm: 0 1px 3px rgba(21, 26, 35, 0.04);
+  --shadow: 0 2px 6px -2px rgba(21, 26, 35, 0.06);
+  --shadow-md: 0 5px 14px -6px rgba(21, 26, 35, 0.10);
+  --shadow-lg: 0 10px 28px -12px rgba(21, 26, 35, 0.14);
+  --shadow-xl: 0 16px 40px -16px rgba(21, 26, 35, 0.16);
+  --shadow-2xl: 0 24px 64px -24px rgba(21, 26, 35, 0.20);
 
   /* SPACING */
   --spacing: 0.24rem;
@@ -302,7 +302,7 @@ a:hover {
 .ant-input-password:focus,
 .ant-input-password-focused {
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12) !important;
+  box-shadow: 0 0 0 3px rgba(23, 87, 210, 0.12) !important;
 }
 
 .ant-card {
