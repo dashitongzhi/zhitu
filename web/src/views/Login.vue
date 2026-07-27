@@ -3,8 +3,8 @@
     <div class="login-card">
       <!-- Logo 和标题 -->
       <div class="login-header">
-        <img src="/favicon.svg" alt="职途AI" class="logo" />
-        <h1 class="title">职途AI</h1>
+        <img src="/favicon.svg" alt="职途" class="logo" />
+        <h1 class="title">职途</h1>
         <p class="subtitle">智能求职助手平台</p>
       </div>
 

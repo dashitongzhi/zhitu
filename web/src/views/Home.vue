@@ -1,339 +1,565 @@
 <template>
-  <div class="home-page">
-    <!-- 顶部导航栏 -->
+  <div class="home-page" :style="{ '--page-bg': `url(${pageBackgroundImage})` }">
+    <!-- 整页底层背景图：极淡写实摄影，fixed 固定视差 -->
+    <div class="page-bg-layer" aria-hidden="true"></div>
+
+    <!-- 顶部导航栏：固定定位 + 毛玻璃背景 -->
     <header class="navbar">
       <div class="nav-inner">
         <div class="brand">
-          <img src="/favicon.svg" alt="职途AI" class="brand-logo" />
-          <span class="brand-name">职途AI</span>
+          <span class="brand-logo">
+            <ThunderboltOutlined />
+          </span>
+          <span class="brand-name">职途</span>
         </div>
         <nav class="nav-links">
-          <a href="#features">功能特性</a>
-          <a href="#workflow">使用流程</a>
-          <a href="#faq">常见问题</a>
+          <a href="#features" @click.prevent="scrollTo('features')">功能特性</a>
+          <a href="#workflow" @click.prevent="scrollTo('workflow')">使用流程</a>
+          <a href="#faq" @click.prevent="scrollTo('faq')">常见问题</a>
         </nav>
         <div class="nav-actions">
-          <a-button type="text" @click="scrollToAuth">登录</a-button>
-          <a-button type="primary" @click="switchToRegister">免费注册</a-button>
+          <button class="btn-ghost" type="button" @click="openAuthModal('login')">
+            登录
+          </button>
+          <button class="btn-primary" type="button" @click="openAuthModal('register')">
+            免费注册
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Hero 区 -->
+    <!-- Hero 区：大标题 + 副标题 + 统计数据 + 双 CTA -->
     <section class="hero">
-      <div class="hero-bg">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
-      </div>
+      <!-- 写实摄影背景层 -->
+      <div class="hero-bg-layer" :style="{ backgroundImage: `url(${heroBackgroundImage})` }" aria-hidden="true"></div>
+      <div class="hero-bg-overlay" aria-hidden="true"></div>
+      <!-- 装饰性光晕背景 -->
+      <div class="hero-blob hero-blob-1"></div>
+      <div class="hero-blob hero-blob-2"></div>
 
       <div class="hero-container">
-        <!-- 左侧文案 -->
-        <div class="hero-content">
+        <div class="hero-left">
+          <!-- 顶部标签 -->
           <div class="hero-badge">
-            <span class="badge-dot"></span>
-            AI 驱动的智能求职助手
+            <span class="hero-badge-dot"></span>
+            <span>AI 驱动的智能求职助手</span>
           </div>
+
+          <!-- 主标题：响应式缩放，48px / 700 -->
           <h1 class="hero-title">
-            让每一次求职<br />
-            都<span class="highlight">精准而高效</span>
+            让每一次求职都<br />
+            <span class="hero-title-accent">精准而高效</span>
           </h1>
+
+          <!-- 副标题：18px / muted -->
           <p class="hero-desc">
-            职途AI 帮你管理个人档案、智能生成与润色简历、模拟真实面试场景、追踪投递进度。
-            从准备到入职，一站式陪伴你的求职之旅。
+            职途 融合智能简历生成、模拟面试与投递看板，为求职者提供端到端的求职支持，让每一次机会都被认真对待。
           </p>
 
+          <!-- 数据统计 -->
           <div class="hero-stats">
-            <div class="stat-item">
-              <div class="stat-num">4+</div>
-              <div class="stat-label">核心模块</div>
+            <div class="hero-stat">
+              <div class="hero-stat-value">4+</div>
+              <div class="hero-stat-label">核心模块</div>
             </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-              <div class="stat-num">AI</div>
-              <div class="stat-label">智能生成</div>
+            <div class="hero-stat">
+              <div class="hero-stat-value">AI</div>
+              <div class="hero-stat-label">智能生成</div>
             </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-              <div class="stat-num">100%</div>
-              <div class="stat-label">本地化部署</div>
+            <div class="hero-stat">
+              <div class="hero-stat-value">100%</div>
+              <div class="hero-stat-label">本地化部署</div>
             </div>
           </div>
 
+          <!-- 双 CTA 按钮：主按钮「立即开始」+ 次按钮「了解更多」 -->
           <div class="hero-cta">
-            <a-button type="primary" size="large" @click="switchToRegister">
-              立即开始使用
-              <template #icon>
-                <ArrowRightOutlined />
-              </template>
-            </a-button>
-            <a-button size="large" ghost @click="scrollToFeatures">
+            <button class="btn-primary btn-lg" type="button" @click="handlePrimaryCta">
+              立即开始
+              <ArrowRightOutlined />
+            </button>
+            <button class="btn-secondary btn-lg" type="button" @click="scrollTo('features')">
               了解更多
-            </a-button>
+            </button>
           </div>
         </div>
 
-        <!-- 右侧登录/注册卡片 -->
-        <div class="auth-card" id="auth-card">
-          <div class="auth-card-header">
-            <div class="auth-tabs">
-              <button
-                class="auth-tab"
-                :class="{ active: activeTab === 'login' }"
-                @click="activeTab = 'login'"
-              >
-                登录
-              </button>
-              <button
-                class="auth-tab"
-                :class="{ active: activeTab === 'register' }"
-                @click="activeTab = 'register'"
-              >
-                注册
-              </button>
-              <div
-                class="auth-tab-indicator"
-                :class="{ 'indicator-right': activeTab === 'register' }"
-              ></div>
+        <!-- Hero 右侧：产品预览浮卡组合 -->
+        <div class="hero-right">
+          <!-- 主预览卡片：模拟简历编辑器 -->
+          <div class="preview-card preview-main">
+            <div class="preview-header">
+              <span class="preview-dot" style="background:#ff5f57"></span>
+              <span class="preview-dot" style="background:#febc2e"></span>
+              <span class="preview-dot" style="background:#28c840"></span>
+              <span class="preview-title">简历实验室</span>
+            </div>
+            <div class="preview-cover">
+              <img :src="heroPreviewImage" alt="简历实验室工作场景" loading="lazy" />
+              <div class="preview-cover-overlay">
+                <div class="preview-cover-row">
+                  <span class="preview-cover-label">JD 匹配度</span>
+                  <span class="preview-cover-value">92%</span>
+                </div>
+                <div class="preview-cover-row">
+                  <span class="preview-cover-label">AI 优化</span>
+                  <span class="preview-cover-tags">
+                    <span class="preview-tag">措辞润色</span>
+                    <span class="preview-tag">经历强化</span>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- 登录表单 -->
-          <a-form
-            v-if="activeTab === 'login'"
-            :model="loginForm"
-            :rules="loginRules"
-            @finish="handleLogin"
-            layout="vertical"
-            class="auth-form"
-          >
-            <a-form-item label="邮箱" name="email">
-              <a-input
-                v-model:value="loginForm.email"
-                placeholder="请输入邮箱"
-                size="large"
-              >
-                <template #prefix>
-                  <MailOutlined class="input-icon" />
-                </template>
-              </a-input>
-            </a-form-item>
-
-            <a-form-item label="密码" name="password">
-              <a-input-password
-                v-model:value="loginForm.password"
-                placeholder="请输入密码"
-                size="large"
-                @keyup.enter="handleLogin"
-              >
-                <template #prefix>
-                  <LockOutlined class="input-icon" />
-                </template>
-              </a-input-password>
-            </a-form-item>
-
-            <a-form-item>
-              <a-button
-                type="primary"
-                html-type="submit"
-                size="large"
-                block
-                :loading="loading"
-              >
-                登录
-              </a-button>
-            </a-form-item>
-
-            <div class="auth-switch">
-              还没有账号？
-              <a @click="activeTab = 'register'">立即注册</a>
+          <!-- 浮卡 1：面试训练 -->
+          <div class="preview-card preview-float preview-float-1">
+            <div class="preview-float-icon" style="background:var(--brand-50);color:var(--primary)">
+              <MessageOutlined />
             </div>
-          </a-form>
-
-          <!-- 注册表单 -->
-          <a-form
-            v-else
-            :model="registerForm"
-            :rules="registerRules"
-            @finish="handleRegister"
-            layout="vertical"
-            class="auth-form"
-          >
-            <a-form-item label="邮箱" name="email">
-              <a-input
-                v-model:value="registerForm.email"
-                placeholder="请输入邮箱"
-                size="large"
-              >
-                <template #prefix>
-                  <MailOutlined class="input-icon" />
-                </template>
-              </a-input>
-            </a-form-item>
-
-            <a-form-item label="昵称" name="nickname">
-              <a-input
-                v-model:value="registerForm.nickname"
-                placeholder="请输入昵称"
-                size="large"
-              >
-                <template #prefix>
-                  <UserOutlined class="input-icon" />
-                </template>
-              </a-input>
-            </a-form-item>
-
-            <a-form-item label="密码" name="password">
-              <a-input-password
-                v-model:value="registerForm.password"
-                placeholder="请输入密码（不少于6位）"
-                size="large"
-              >
-                <template #prefix>
-                  <LockOutlined class="input-icon" />
-                </template>
-              </a-input-password>
-            </a-form-item>
-
-            <a-form-item label="确认密码" name="confirmPassword">
-              <a-input-password
-                v-model:value="registerForm.confirmPassword"
-                placeholder="请再次输入密码"
-                size="large"
-              >
-                <template #prefix>
-                  <LockOutlined class="input-icon" />
-                </template>
-              </a-input-password>
-            </a-form-item>
-
-            <a-form-item>
-              <a-button
-                type="primary"
-                html-type="submit"
-                size="large"
-                block
-                :loading="loading"
-              >
-                注册
-              </a-button>
-            </a-form-item>
-
-            <div class="auth-switch">
-              已有账号？
-              <a @click="activeTab = 'login'">立即登录</a>
+            <div>
+              <div class="preview-float-title">面试训练中</div>
+              <div class="preview-float-sub">第 3 轮 · 深度追问</div>
             </div>
-          </a-form>
+          </div>
+
+          <!-- 浮卡 2：投递看板统计 -->
+          <div class="preview-card preview-float preview-float-2">
+            <div class="preview-float-icon" style="background:rgba(52,199,89,0.14);color:#34c759">
+              <SendOutlined />
+            </div>
+            <div>
+              <div class="preview-float-title">本周投递</div>
+              <div class="preview-float-sub">12 次 · 3 次面试</div>
+            </div>
+          </div>
+
+          <!-- 浮卡 3：Offer 数 -->
+          <div class="preview-card preview-float preview-float-3">
+            <div class="preview-float-icon" style="background:rgba(175,82,222,0.14);color:#af52de">
+              <CheckCircleFilled />
+            </div>
+            <div>
+              <div class="preview-float-title">已获 Offer</div>
+              <div class="preview-float-sub">2 个 · 待抉择</div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- 功能特性区 -->
-    <section class="features" id="features">
-      <div class="section-inner">
-        <div class="section-header">
-          <div class="section-tag">核心功能</div>
+    <!-- 功能入口区：3 个卡片（简历实验室、面试训练场、投递看板） -->
+    <section id="features" class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-eyebrow">功能特性</span>
           <h2 class="section-title">一站式求职解决方案</h2>
-          <p class="section-desc">
-            从个人档案到投递跟踪，覆盖求职全流程，让 AI 为你的每一步赋能
+          <p class="section-sub">
+            从简历到面试，从投递到追踪，职途 覆盖求职全流程。
           </p>
         </div>
 
         <div class="feature-grid">
-          <div
+          <article
             v-for="feature in features"
             :key="feature.title"
             class="feature-card"
+            @click="handleFeatureClick(feature)"
           >
-            <div class="feature-icon" :style="{ background: feature.gradient }">
+            <!-- 卡片图标 -->
+            <div class="feature-icon">
               <component :is="feature.icon" />
             </div>
-            <h3 class="feature-title">{{ feature.title }}</h3>
-            <p class="feature-desc">{{ feature.desc }}</p>
-            <ul class="feature-list">
-              <li v-for="item in feature.points" :key="item">
-                <CheckCircleFilled class="check-icon" />
-                <span>{{ item }}</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 使用流程区 -->
-    <section class="workflow" id="workflow">
-      <div class="section-inner">
-        <div class="section-header">
-          <div class="section-tag">使用流程</div>
-          <h2 class="section-title">四步开启你的求职之旅</h2>
-          <p class="section-desc">简单几步，让 AI 帮你打造专属求职策略</p>
-        </div>
-
-        <div class="workflow-steps">
-          <div
-            v-for="(step, index) in steps"
-            :key="step.title"
-            class="step-item"
-          >
-            <div class="step-num">{{ String(index + 1).padStart(2, '0') }}</div>
-            <div class="step-line" v-if="index < steps.length - 1"></div>
-            <div class="step-content">
-              <h3 class="step-title">{{ step.title }}</h3>
-              <p class="step-desc">{{ step.desc }}</p>
+            <!-- 卡片正文 -->
+            <div class="feature-body">
+              <h3 class="feature-title">{{ feature.title }}</h3>
+              <p class="feature-desc">{{ feature.desc }}</p>
+              <!-- 特性标签 -->
+              <div class="feature-tags">
+                <span v-for="tag in feature.tags" :key="tag" class="feature-tag">{{ tag }}</span>
+              </div>
+              <!-- 亮点列表 -->
+              <ul class="feature-highlights">
+                <li v-for="h in feature.highlights" :key="h">
+                  <CheckCircleFilled class="feature-check" />
+                  <span>{{ h }}</span>
+                </li>
+              </ul>
             </div>
+            <!-- 卡片箭头：hover 时右移 -->
+            <div class="feature-arrow">
+              <ArrowRightOutlined />
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 核心能力：6 项技术亮点（2x3 网格） -->
+    <section class="section section-tint">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-eyebrow">核心能力</span>
+          <h2 class="section-title">技术驱动的求职引擎</h2>
+          <p class="section-sub">
+            从 AI 匹配到数据看板，从安全隔离到极速响应，每一项能力都为求职效率服务。
+          </p>
+        </div>
+
+        <div class="capability-grid">
+          <article
+            v-for="cap in capabilities"
+            :key="cap.title"
+            class="capability-card"
+          >
+            <div class="capability-icon">
+              <component :is="cap.icon" />
+            </div>
+            <div class="capability-body">
+              <h3 class="capability-title">{{ cap.title }}</h3>
+              <p class="capability-desc">{{ cap.desc }}</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数据成果：渐变背景 + 4 个大数字 -->
+    <section class="section section-grad">
+      <div class="container">
+        <div class="section-head section-head-light">
+          <span class="section-eyebrow section-eyebrow-light">数据成果</span>
+          <h2 class="section-title section-title-light">用数字说话</h2>
+          <p class="section-sub section-sub-light">
+            一组关键指标，看清职途 的能力边界。
+          </p>
+        </div>
+
+        <div class="achievement-grid">
+          <div v-for="a in achievements" :key="a.label" class="achievement-card">
+            <div class="achievement-value">{{ a.value }}</div>
+            <div class="achievement-label">{{ a.label }}</div>
+            <div class="achievement-sub">{{ a.sub }}</div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 常见问题 -->
-    <section class="faq" id="faq">
-      <div class="section-inner">
-        <div class="section-header">
-          <div class="section-tag">常见问题</div>
-          <h2 class="section-title">关于职途AI</h2>
+    <!-- 用户证言：3 张卡片墙 -->
+    <section class="section section-photo">
+      <div class="section-bg-layer" :style="{ backgroundImage: `url(${testimonialBackgroundImage})` }" aria-hidden="true"></div>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-eyebrow">用户证言</span>
+          <h2 class="section-title">求职者的真实反馈</h2>
+          <p class="section-sub">
+            来自不同岗位、不同经验的求职者，分享他们与职途 的故事。
+          </p>
         </div>
 
-        <a-collapse :bordered="false" class="faq-collapse">
-          <a-collapse-panel
-            v-for="(item, index) in faqs"
-            :key="index"
-            :header="item.q"
+        <div class="testimonial-grid">
+          <article
+            v-for="t in testimonials"
+            :key="t.name"
+            class="testimonial-card"
           >
-            <p class="faq-answer">{{ item.a }}</p>
+            <div class="testimonial-stars">
+              <StarFilled v-for="n in 5" :key="n" />
+            </div>
+            <p class="testimonial-quote">"{{ t.quote }}"</p>
+            <div class="testimonial-author">
+              <img :src="t.photo" :alt="t.name" class="testimonial-avatar" loading="lazy" />
+              <div>
+                <div class="testimonial-name">{{ t.name }}</div>
+                <div class="testimonial-role">{{ t.role }}</div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 使用流程：4 步时间轴 -->
+    <section id="workflow" class="section section-alt">
+      <div class="section-bg-layer" :style="{ backgroundImage: `url(${workflowBackgroundImage})` }" aria-hidden="true"></div>
+      <div class="container">
+        <div class="section-head">
+          <span class="section-eyebrow">使用流程</span>
+          <h2 class="section-title">四步开启你的求职之旅</h2>
+          <p class="section-sub">
+            从注册到入职，职途 陪你走完求职全流程。
+          </p>
+        </div>
+
+        <div class="workflow-grid">
+          <article
+            v-for="(step, idx) in workflows"
+            :key="step.title"
+            class="workflow-card"
+          >
+            <!-- 步骤序号 -->
+            <div class="workflow-index">
+              <span class="workflow-index-num">{{ idx + 1 }}</span>
+              <span
+                v-if="idx < workflows.length - 1"
+                class="workflow-index-line"
+              ></span>
+            </div>
+            <!-- 步骤内容 -->
+            <div class="workflow-content">
+              <div class="workflow-icon">
+                <component :is="step.icon" />
+              </div>
+              <h3 class="workflow-title">{{ step.title }}</h3>
+              <p class="workflow-desc">{{ step.desc }}</p>
+              <ul class="workflow-points">
+                <li v-for="point in step.points" :key="point">{{ point }}</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 常见问题：折叠面板 -->
+    <section id="faq" class="section">
+      <div class="container container-narrow">
+        <div class="section-head">
+          <span class="section-eyebrow">常见问题</span>
+          <h2 class="section-title">还有疑问？看这里</h2>
+          <p class="section-sub">
+            收录用户最常问的问题，帮你快速上手职途。
+          </p>
+        </div>
+
+        <a-collapse
+          :bordered="false"
+          :accordion="true"
+          class="faq-collapse"
+          :default-active-key="['1']"
+        >
+          <a-collapse-panel
+            v-for="faq in faqs"
+            :key="faq.key"
+            :header="faq.q"
+            class="faq-panel"
+          >
+            <p class="faq-answer">{{ faq.a }}</p>
           </a-collapse-panel>
         </a-collapse>
-      </div>
-    </section>
 
-    <!-- CTA 区 -->
-    <section class="cta-section">
-      <div class="cta-inner">
-        <h2 class="cta-title">准备好开启智能求职之旅了吗？</h2>
-        <p class="cta-desc">注册即可免费使用全部功能</p>
-        <a-button
-          type="primary"
-          size="large"
-          class="cta-btn"
-          @click="switchToRegister"
-        >
-          立即免费注册
-        </a-button>
+        <!-- 底部辅助 CTA -->
+        <div class="faq-cta">
+          <span class="faq-cta-text">没有找到你要的答案？</span>
+          <button
+            class="btn-ghost"
+            type="button"
+            @click="openAuthModal('register')"
+          >
+            立即体验，遇到问题随时反馈
+          </button>
+        </div>
       </div>
     </section>
 
     <!-- 页脚 -->
     <footer class="footer">
-      <div class="footer-inner">
-        <div class="footer-brand">
-          <img src="/favicon.svg" alt="职途AI" class="footer-logo" />
-          <span>职途AI</span>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-col footer-col-brand">
+            <div class="footer-brand">
+              <span class="footer-logo">
+                <ThunderboltOutlined />
+              </span>
+              <span>职途</span>
+            </div>
+            <p class="footer-tagline">让求职更简单 · 智能求职助手平台</p>
+            <p class="footer-copy">© 2026 职途. All rights reserved.</p>
+          </div>
+          <div class="footer-col">
+            <h4 class="footer-title">产品</h4>
+            <a @click.prevent="handleFeatureClick({ path: '/app/resumes' })">简历实验室</a>
+            <a @click.prevent="handleFeatureClick({ path: '/app/interviews' })">面试训练场</a>
+            <a @click.prevent="handleFeatureClick({ path: '/app/applications' })">投递看板</a>
+          </div>
+          <div class="footer-col">
+            <h4 class="footer-title">资源</h4>
+            <a @click.prevent="scrollTo('features')">功能特性</a>
+            <a @click.prevent="scrollTo('workflow')">使用流程</a>
+            <a @click.prevent="scrollTo('faq')">常见问题</a>
+          </div>
+          <div class="footer-col">
+            <h4 class="footer-title">关于</h4>
+            <a @click.prevent="openAuthModal('register')">免费注册</a>
+            <a @click.prevent="openAuthModal('login')">登录</a>
+            <a @click.prevent="handlePrimaryCta">立即开始</a>
+          </div>
         </div>
-        <p class="footer-text">让求职更简单 · 智能求职助手平台</p>
-        <p class="footer-copy">© 2024 职途AI. All rights reserved.</p>
       </div>
     </footer>
+
+    <!-- 登录 / 注册弹窗：使用 a-modal + a-form -->
+    <a-modal
+      v-model:open="authModalVisible"
+      :footer="null"
+      :width="420"
+      class="auth-modal"
+      :destroy-on-close="false"
+    >
+      <div class="auth-modal-body">
+        <!-- 弹窗标题 -->
+        <h3 class="auth-modal-title">
+          {{ activeTab === 'login' ? '欢迎回来' : '创建账号' }}
+        </h3>
+        <p class="auth-modal-sub">
+          {{ activeTab === 'login' ? '登录以继续你的求职之旅' : '注册即可免费使用全部功能' }}
+        </p>
+
+        <!-- 登录 / 注册 切换 tabs -->
+        <div class="auth-tabs">
+          <button
+            class="auth-tab"
+            :class="{ 'auth-tab-active': activeTab === 'login' }"
+            type="button"
+            @click="activeTab = 'login'"
+          >
+            登录
+          </button>
+          <button
+            class="auth-tab"
+            :class="{ 'auth-tab-active': activeTab === 'register' }"
+            type="button"
+            @click="activeTab = 'register'"
+          >
+            注册
+          </button>
+        </div>
+
+        <!-- 登录表单 -->
+        <a-form
+          v-if="activeTab === 'login'"
+          :model="loginForm"
+          :rules="loginRules"
+          layout="vertical"
+          class="auth-form"
+          @finish="handleLogin"
+        >
+          <a-form-item label="邮箱" name="email">
+            <a-input
+              v-model:value="loginForm.email"
+              placeholder="请输入邮箱"
+              size="large"
+            >
+              <template #prefix>
+                <MailOutlined class="input-icon" />
+              </template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item label="密码" name="password">
+            <a-input-password
+              v-model:value="loginForm.password"
+              placeholder="请输入密码"
+              size="large"
+            >
+              <template #prefix>
+                <LockOutlined class="input-icon" />
+              </template>
+            </a-input-password>
+          </a-form-item>
+
+          <a-form-item>
+            <button
+              type="submit"
+              class="btn-primary btn-lg auth-submit"
+              :class="{ 'is-loading': loading }"
+              :disabled="loading"
+            >
+              {{ loading ? '登录中…' : '登录' }}
+            </button>
+          </a-form-item>
+
+          <div class="auth-switch">
+            还没有账号？
+            <a @click="activeTab = 'register'">立即注册</a>
+          </div>
+        </a-form>
+
+        <!-- 注册表单 -->
+        <a-form
+          v-else
+          :model="registerForm"
+          :rules="registerRules"
+          layout="vertical"
+          class="auth-form"
+          @finish="handleRegister"
+        >
+          <a-form-item label="邮箱" name="email">
+            <a-input
+              v-model:value="registerForm.email"
+              placeholder="请输入邮箱"
+              size="large"
+            >
+              <template #prefix>
+                <MailOutlined class="input-icon" />
+              </template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item label="昵称" name="nickname">
+            <a-input
+              v-model:value="registerForm.nickname"
+              placeholder="请输入昵称"
+              size="large"
+            >
+              <template #prefix>
+                <UserOutlined class="input-icon" />
+              </template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item label="密码" name="password">
+            <a-input-password
+              v-model:value="registerForm.password"
+              placeholder="请输入密码（不少于 6 位）"
+              size="large"
+            >
+              <template #prefix>
+                <LockOutlined class="input-icon" />
+              </template>
+            </a-input-password>
+          </a-form-item>
+
+          <a-form-item label="确认密码" name="confirmPassword">
+            <a-input-password
+              v-model:value="registerForm.confirmPassword"
+              placeholder="请再次输入密码"
+              size="large"
+            >
+              <template #prefix>
+                <LockOutlined class="input-icon" />
+              </template>
+            </a-input-password>
+          </a-form-item>
+
+          <a-form-item>
+            <button
+              type="submit"
+              class="btn-primary btn-lg auth-submit"
+              :class="{ 'is-loading': loading }"
+              :disabled="loading"
+            >
+              {{ loading ? '注册中…' : '注册' }}
+            </button>
+          </a-form-item>
+
+          <div class="auth-switch">
+            已有账号？
+            <a @click="activeTab = 'login'">立即登录</a>
+          </div>
+        </a-form>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -346,11 +572,22 @@ import {
   LockOutlined,
   UserOutlined,
   ArrowRightOutlined,
-  CheckCircleFilled,
-  ProfileOutlined,
   FileTextOutlined,
   MessageOutlined,
   SendOutlined,
+  ThunderboltOutlined,
+  UserAddOutlined,
+  EditOutlined,
+  VideoCameraOutlined,
+  FundProjectionScreenOutlined,
+  SafetyCertificateOutlined,
+  RocketOutlined,
+  BulbOutlined,
+  LineChartOutlined,
+  CloudOutlined,
+  ClockCircleOutlined,
+  CheckCircleFilled,
+  StarFilled,
 } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { Rule } from 'ant-design-vue/es/form'
@@ -358,6 +595,8 @@ import type { Rule } from 'ant-design-vue/es/form'
 const router = useRouter()
 const authStore = useAuthStore()
 
+// 弹窗状态
+const authModalVisible = ref(false)
 const activeTab = ref<'login' | 'register'>('login')
 const loading = ref(false)
 
@@ -374,7 +613,7 @@ const loginRules: Record<string, Rule[]> = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于 6 位', trigger: 'blur' },
   ],
 }
 
@@ -386,6 +625,7 @@ const registerForm = reactive({
   confirmPassword: '',
 })
 
+// 确认密码校验
 const validateConfirmPassword = async (_rule: Rule, value: string) => {
   if (value !== registerForm.password) {
     return Promise.reject('两次输入的密码不一致')
@@ -400,16 +640,22 @@ const registerRules: Record<string, Rule[]> = {
   ],
   nickname: [
     { required: true, message: '请输入昵称', trigger: 'blur' },
-    { min: 2, max: 20, message: '昵称长度为2-20个字符', trigger: 'blur' },
+    { min: 2, max: 20, message: '昵称长度为 2-20 个字符', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于 6 位', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请再次输入密码', trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' },
   ],
+}
+
+// 打开认证弹窗
+const openAuthModal = (tab: 'login' | 'register') => {
+  activeTab.value = tab
+  authModalVisible.value = true
 }
 
 // 处理登录
@@ -418,6 +664,7 @@ const handleLogin = async () => {
   try {
     const success = await authStore.login(loginForm)
     if (success) {
+      authModalVisible.value = false
       router.push('/app')
     }
   } finally {
@@ -446,126 +693,252 @@ const handleRegister = async () => {
   }
 }
 
-// 滚动到认证卡片
-const scrollToAuth = () => {
-  const el = document.getElementById('auth-card')
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-}
-
-// 滚动到功能区
-const scrollToFeatures = () => {
-  const el = document.getElementById('features')
+// 平滑滚动到指定锚点
+const scrollTo = (id: string) => {
+  const el = document.getElementById(id)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// 切换到注册 tab 并滚动
-const switchToRegister = () => {
-  activeTab.value = 'register'
-  scrollToAuth()
+// 主 CTA 按钮：已登录跳转 /app，未登录打开注册弹窗
+const handlePrimaryCta = () => {
+  if (authStore.isAuthenticated) {
+    router.push('/app')
+  } else {
+    openAuthModal('register')
+  }
 }
 
-// 功能特性数据
+// 功能入口卡片数据：3 个核心模块
 const features = [
   {
-    title: '个人档案管理',
-    desc: '完整记录你的教育背景、工作经历、项目经验等信息，AI 实时评估档案完成度。',
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    icon: markRaw(ProfileOutlined),
-    points: ['多维信息结构化存储', '完成度智能评估', '简历生成数据源'],
-  },
-  {
-    title: '智能简历生成',
-    desc: '基于个人档案与目标岗位 JD，AI 自动生成、润色简历，并提供专业评分建议。',
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    title: '简历实验室',
+    desc: '基于目标岗位 JD 智能生成简历，AI 润色表达，多份简历灵活切换。',
     icon: markRaw(FileTextOutlined),
-    points: ['针对 JD 定制生成', 'AI 润色与优化', '多份简历管理'],
+    path: '/app/resumes',
+    tags: ['JD 匹配', 'AI 润色', '多份管理'],
+    highlights: ['智能生成结构化简历', '一键优化措辞表达', 'A4 实时预览'],
   },
   {
-    title: 'AI 模拟面试',
-    desc: '支持语音/文字多种模式，模拟真实企业面试场景，每次面试形成完整记录。',
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    title: '面试训练场',
+    desc: '多轮深度追问，语音与文字双模式，面试记录随时回看复盘。',
     icon: markRaw(MessageOutlined),
-    points: ['多轮次深度追问', '语音+文字双模式', '面试记录留存'],
+    path: '/app/interviews',
+    tags: ['多轮追问', '语音文字', '复盘回放'],
+    highlights: ['覆盖主流岗位题库', 'AI 实时深度追问', '完整记录随时回看'],
   },
   {
-    title: '投递看板追踪',
-    desc: '可视化管理求职投递全流程，从投递到 offer，状态流转一目了然。',
-    gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    title: '投递看板',
+    desc: '看板式管理投递状态，记录面试轮次，洞察投递漏斗转化。',
     icon: markRaw(SendOutlined),
-    points: ['看板式状态管理', '面试轮次记录', '投递漏斗分析'],
+    path: '/app/applications',
+    tags: ['看板视图', '漏斗分析', '面试追踪'],
+    highlights: ['6 列状态灵活拖拽', '面试轮次完整记录', '投递漏斗转化洞察'],
   },
 ]
 
-// 流程步骤
-const steps = [
+// 核心能力：6 项技术亮点
+const capabilities = [
   {
-    title: '创建账号',
-    desc: '邮箱注册即可开始使用，无需复杂配置',
+    title: 'JD 智能匹配',
+    desc: '基于目标岗位 JD 自动生成结构化简历内容，匹配度提升 80%。',
+    icon: markRaw(BulbOutlined),
   },
   {
-    title: '完善档案',
-    desc: '填写个人教育、工作、项目等信息，提升档案完成度',
+    title: '多轮深度追问',
+    desc: 'AI 模拟真实面试官，根据你的回答进行多轮深度追问。',
+    icon: markRaw(MessageOutlined),
   },
   {
-    title: '生成简历',
-    desc: '选择目标岗位，AI 自动生成定制化简历并智能润色',
+    title: '实时数据看板',
+    desc: '投递漏斗、转化率、行业分布一目了然，数据驱动求职决策。',
+    icon: markRaw(LineChartOutlined),
   },
   {
-    title: '模拟面试 & 投递',
-    desc: '通过 AI 面试演练提升能力，追踪每一次投递进度',
+    title: '本地化部署',
+    desc: '所有数据存储在你自己的服务器，隐私不外泄，安全可控。',
+    icon: markRaw(CloudOutlined),
+  },
+  {
+    title: 'JWT 双密钥隔离',
+    desc: '用户与管理员 token 独立签发，权限边界清晰，安全保障。',
+    icon: markRaw(SafetyCertificateOutlined),
+  },
+  {
+    title: '极速响应',
+    desc: '流式 AI 输出，秒级响应，简历生成与面试对答流畅无卡顿。',
+    icon: markRaw(RocketOutlined),
   },
 ]
 
-// 常见问题
+// 数据成果
+const achievements = [
+  { value: '4+', label: '核心功能模块', sub: '简历 / 面试 / 投递 / 数据' },
+  { value: '6', label: '看板状态列', sub: '从投递到 Offer 全链路' },
+  { value: '100%', label: '本地化部署', sub: '数据自托管，隐私可控' },
+  { value: '∞', label: 'AI 对话轮次', sub: '多轮深度追问不限制' },
+]
+
+// 用户证言
+const testimonials = [
+  {
+    quote: '从粘贴 JD 到生成简历只用了 30 秒，AI 优化的措辞比我手写的专业太多了。',
+    name: '张同学',
+    role: '前端工程师 · 3 年经验',
+    avatar: 'Z',
+    color: '#007aff',
+    photo:
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20headshot%20portrait%20of%20young%20Chinese%20woman%2C%20mid%20twenties%2C%20software%20engineer%2C%20soft%20natural%20light%2C%20blurred%20office%20background%2C%20subtle%20smile%2C%20smart%20casual%20blouse%2C%204k&image_size=square_hd',
+  },
+  {
+    quote: '模拟面试的追问很真实，第一次面试被问懵的题，第二次在这里练熟了，正式面试拿下 Offer。',
+    name: '李同学',
+    role: '后端开发 · 应届生',
+    avatar: 'L',
+    color: '#34c759',
+    photo:
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20headshot%20portrait%20of%20young%20Chinese%20man%2C%20early%20twenties%2C%20graduate%20developer%2C%20soft%20studio%20light%2C%20neutral%20background%2C%20friendly%20smile%2C%20collared%20shirt%2C%204k&image_size=square_hd',
+  },
+  {
+    quote: '投递看板让我看清自己的漏斗，原来拒了 20 家只有 3 家面试，调整策略后面试率翻倍。',
+    name: '王同学',
+    role: '产品经理 · 转行求职',
+    avatar: 'W',
+    color: '#af52de',
+    photo:
+      'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20headshot%20portrait%20of%20Chinese%20man%20around%20thirty%2C%20product%20manager%2C%20soft%20natural%20light%2C%20blurred%20office%20background%2C%20confident%20expression%2C%20business%20casual%2C%204k&image_size=square_hd',
+  },
+]
+
+// Hero 右侧主预览图：写实摄影风的简历桌面场景
+const heroPreviewImage =
+  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20editorial%20workspace%20photography%2C%20modern%20wooden%20desk%20with%20open%20laptop%20showing%20resume%20document%2C%20notebook%2C%20pen%2C%20soft%20natural%20window%20light%20from%20left%2C%20shallow%20depth%20of%20field%2C%20warm%20neutral%20color%20palette%2C%20professional%204k%20photograph&image_size=landscape_4_3'
+
+// 整页底层背景：极淡的办公室写实摄影，做整体氛围底色
+const pageBackgroundImage =
+  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20minimalist%20modern%20office%20interior%2C%20soft%20natural%20daylight%2C%20light%20wooden%20floor%2C%20white%20walls%2C%20subtle%20plant%20silhouette%2C%20extremely%20subtle%20and%20calm%2C%20muted%20neutral%20beige%20tones%2C%20professional%20corporate%20atmosphere%2C%204k%20photograph&image_size=landscape_16_9'
+
+// Hero 区背景：城市写字楼天际线写实摄影
+const heroBackgroundImage =
+  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20modern%20city%20skyline%20with%20glass%20office%20towers%20at%20blue%20hour%2C%20soft%20gradient%20sky%2C%20calm%20professional%20corporate%20mood%2C%20subtle%20haze%2C%20muted%20blue%20and%20beige%20tones%2C%204k%20photograph&image_size=landscape_16_9'
+
+// 用户证言区背景：开放式办公空间写实摄影
+const testimonialBackgroundImage =
+  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20open%20plan%20office%20workspace%2C%20warm%20ambient%20light%2C%20blurred%20background%2C%20modern%20minimalist%20interior%2C%20neutral%20color%20palette%2C%20professional%20atmosphere%2C%204k%20photograph&image_size=landscape_16_9'
+
+// 使用流程区背景：写字楼大堂写实摄影
+const workflowBackgroundImage =
+  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=photorealistic%20modern%20corporate%20lobby%20atrium%2C%20clean%20geometric%20architecture%2C%20soft%20daylight%2C%20marble%20floor%2C%20glass%20walls%2C%20neutral%20tones%2C%20professional%20business%20atmosphere%2C%204k%20photograph&image_size=landscape_16_9'
+
+// 功能卡片点击：未登录打开登录弹窗，已登录跳转对应路径
+const handleFeatureClick = (feature: { path: string }) => {
+  if (authStore.isAuthenticated) {
+    router.push(feature.path)
+  } else {
+    openAuthModal('login')
+  }
+}
+
+// 使用流程：4 步时间轴数据
+const workflows = [
+  {
+    title: '注册账号',
+    desc: '一键创建专属求职工作台，所有数据本地化部署，安全可控。',
+    icon: markRaw(UserAddOutlined),
+    points: ['邮箱注册，30 秒搞定', '本地化部署，数据不外泄'],
+  },
+  {
+    title: '完善简历',
+    desc: '粘贴目标岗位 JD，AI 智能生成结构化简历，一键润色表达。',
+    icon: markRaw(EditOutlined),
+    points: ['JD 匹配生成内容', 'AI 优化措辞表达', '多份简历灵活切换'],
+  },
+  {
+    title: '模拟面试',
+    desc: '多轮深度追问，支持语音与文字双模式，记录随时回看复盘。',
+    icon: markRaw(VideoCameraOutlined),
+    points: ['多场景面试题库', '语音文字双模式', '面试记录回放'],
+  },
+  {
+    title: '投递追踪',
+    desc: '看板式管理投递状态，记录面试轮次，洞察投递漏斗转化。',
+    icon: markRaw(FundProjectionScreenOutlined),
+    points: ['6 列状态看板', '面试轮次记录', '投递漏斗分析'],
+  },
+]
+
+// 常见问题：折叠面板数据
 const faqs = [
   {
-    q: '职途AI 是免费的吗？',
-    a: '本平台为本地化部署版本，注册后即可使用全部核心功能，包括档案管理、简历生成、模拟面试和投递看板。',
+    key: '1',
+    q: '我的简历数据安全吗？',
+    a: '职途 采用本地化部署模式，所有用户数据均存储在你自己的服务器上，不会上传至任何第三方。管理员账户通过配置文件管理，不入库，JWT 密钥隔离签发，保障账户安全。',
   },
   {
-    q: 'AI 功能如何工作？',
-    a: '职途AI 接入 OpenAI 兼容的 LLM 接口，结合你的个人档案和目标岗位信息，智能生成简历内容、模拟面试问题，并提供专业的评分建议。',
+    key: '2',
+    q: 'AI 生成的简历质量如何？',
+    a: '简历实验室基于目标岗位 JD 进行智能匹配生成，内容更贴合岗位需求。同时提供 AI 润色与优化建议，可对单条经历进行多次迭代，直到满意为止。建议生成后结合个人实际情况微调，效果更佳。',
   },
   {
-    q: '我的数据安全吗？',
-    a: '所有数据存储在本地 SQLite 数据库中，简历、面试记录等文件也保存在本地服务器，不会上传到第三方。请妥善保管服务器访问权限。',
+    key: '3',
+    q: '模拟面试支持哪些岗位？',
+    a: '模拟面试覆盖前端、后端、算法、产品、运营、设计等主流岗位，每个岗位提供多轮深度追问场景。支持语音与文字双模式输入，面试结束后可查看完整记录并随时回看复盘。',
   },
   {
-    q: '如何开始使用？',
-    a: '点击页面右侧的注册按钮创建账号，登录后进入控制台即可开始完善个人档案、生成简历、模拟面试和投递追踪。',
+    key: '4',
+    q: '投递看板的数据来源是什么？',
+    a: '投递看板的数据来源主要有两类：一是使用者手动新建的投递记录，可填写公司、岗位、薪资、渠道、优先级等字段；二是各大招聘平台（如 Boss 直聘、拉勾等）的投递数据，后续版本将支持批量导入，敬请期待。',
   },
 ]
 </script>
 
 <style scoped>
 .home-page {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  color: #1a1a2e;
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  background: var(--background);
   overflow-x: hidden;
-  /* 覆盖全局蓝色主色为紫色主题，影响 var(--primary-color) 引用 */
-  --primary-color: #667eea;
+  min-height: 100vh;
+  position: relative;
 }
 
-/* ========== 顶部导航栏 ========== */
+/* 整页底层背景图：极淡写实摄影，fixed 视差 */
+.page-bg-layer {
+  position: fixed;
+  inset: 0;
+  background-image: var(--page-bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 让所有内容浮在背景之上 */
+.home-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== 顶部导航栏：固定 + 毛玻璃 ========== */
 .navbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   height: 64px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--border);
   z-index: 100;
 }
 
 .nav-inner {
-  max-width: 1280px;
+  max-width: 1200px;
   height: 100%;
   margin: 0 auto;
-  padding: 0 32px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -574,846 +947,1497 @@ const faqs = [
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .brand-logo {
   width: 32px;
   height: 32px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
 }
 
 .brand-name {
-  font-size: 20px;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
 }
 
 .nav-links {
   display: flex;
+  align-items: center;
   gap: 32px;
 }
 
 .nav-links a {
-  color: #555;
-  font-size: 14px;
-  font-weight: 500;
+  color: var(--foreground);
   text-decoration: none;
-  transition: color 0.2s;
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 0.15s ease;
 }
 
 .nav-links a:hover {
-  color: #667eea;
+  color: var(--primary);
 }
 
 .nav-actions {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+/* ========== 胶囊按钮：border-radius 980px ========== */
+.home-page .btn-primary,
+.home-page .btn-secondary,
+.home-page .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  padding: 10px 20px;
+  border-radius: 980px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
-/* 导航栏主按钮：使用紫色渐变，覆盖 Ant Design 默认蓝色 */
-.nav-actions :deep(.ant-btn-primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+.home-page .btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
-.nav-actions :deep(.ant-btn-primary):hover,
-.nav-actions :deep(.ant-btn-primary):focus {
-  background: linear-gradient(135deg, #5a72e0 0%, #6a3f95 100%);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+.home-page .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  background: var(--brand-600);
+}
+
+.home-page .btn-primary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.home-page .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.home-page .btn-secondary {
+  background: var(--background-200);
+  color: var(--foreground);
+}
+
+.home-page .btn-secondary:hover {
+  transform: translateY(-1px);
+  background: var(--background-300);
+}
+
+.home-page .btn-ghost {
+  background: transparent;
+  color: var(--foreground);
+  padding: 10px 14px;
+}
+
+.home-page .btn-ghost:hover {
+  background: var(--background-200);
+}
+
+.home-page .btn-lg {
+  padding: 14px 28px;
+  font-size: 16px;
 }
 
 /* ========== Hero 区 ========== */
 .hero {
   position: relative;
   min-height: 100vh;
-  padding: 120px 32px 80px;
+  display: flex;
+  align-items: center;
+  padding: 96px 0 64px;
   overflow: hidden;
-  background: linear-gradient(135deg, #f5f7ff 0%, #ede9fe 50%, #f5f3ff 100%);
+  background: linear-gradient(180deg, var(--background-100) 0%, var(--background) 100%);
 }
 
-.hero-bg {
+/* Hero 写实摄影背景层 */
+.hero-bg-layer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.18;
+  z-index: 0;
 }
 
-.blob {
+.hero-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.78) 0%,
+    rgba(255, 255, 255, 0.92) 70%,
+    var(--background) 100%
+  );
+  z-index: 0;
+}
+
+/* 装饰性光晕 */
+.hero-blob {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.4;
-  animation: float 12s ease-in-out infinite;
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.blob-1 {
-  width: 500px;
-  height: 500px;
-  background: #667eea;
-  top: -150px;
-  left: -100px;
+.hero-blob-1 {
+  width: 480px;
+  height: 480px;
+  background: var(--brand-200);
+  top: -120px;
+  right: -80px;
 }
 
-.blob-2 {
-  width: 400px;
-  height: 400px;
-  background: #f093fb;
-  top: 30%;
-  right: -100px;
-  animation-delay: -4s;
-}
-
-.blob-3 {
-  width: 350px;
-  height: 350px;
-  background: #4facfe;
-  bottom: -100px;
-  left: 40%;
-  animation-delay: -8s;
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(40px, -40px) scale(1.1);
-  }
-  66% {
-    transform: translate(-30px, 30px) scale(0.95);
-  }
+.hero-blob-2 {
+  width: 420px;
+  height: 420px;
+  background: var(--brand-100);
+  bottom: -120px;
+  left: -120px;
+  opacity: 0.5;
 }
 
 .hero-container {
   position: relative;
-  max-width: 1280px;
+  z-index: 1;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 440px;
-  gap: 64px;
+  padding: 0 24px;
+  display: flex;
   align-items: center;
+  gap: 48px;
 }
 
-.hero-content {
-  max-width: 600px;
+.hero-left {
+  flex: 1 1 0;
+  max-width: 640px;
+  min-width: 0;
 }
 
+/* ===== Hero 右侧产品预览浮卡 ===== */
+.hero-right {
+  flex: 0 0 420px;
+  position: relative;
+  height: 460px;
+  max-width: 100%;
+}
+
+.preview-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+.preview-main {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 240px;
+  overflow: hidden;
+}
+
+.preview-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.preview-cover-overlay {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.preview-cover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-cover-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.preview-cover-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.preview-cover-tags {
+  display: flex;
+  gap: 6px;
+}
+
+.preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.preview-title {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-label {
+  flex: 0 0 80px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.preview-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.preview-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--background-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.preview-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--brand-400));
+  border-radius: 999px;
+}
+
+.preview-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.preview-tag {
+  padding: 2px 8px;
+  background: var(--brand-50);
+  color: var(--primary);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.preview-float {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  animation: float-y 4s ease-in-out infinite;
+}
+
+.preview-float-1 {
+  top: -10px;
+  right: -20px;
+  animation-delay: 0s;
+}
+
+.preview-float-2 {
+  bottom: 60px;
+  right: -30px;
+  animation-delay: 1s;
+}
+
+.preview-float-3 {
+  bottom: -10px;
+  left: 20px;
+  animation-delay: 2s;
+}
+
+.preview-float-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.preview-float-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.preview-float-sub {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 顶部胶囊标签 */
 .hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 6px 14px;
+  border-radius: 980px;
   background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-radius: 100px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
   font-size: 13px;
-  color: #667eea;
   font-weight: 500;
+  color: var(--foreground);
   margin-bottom: 24px;
 }
 
-.badge-dot {
+.hero-badge-dot {
   width: 8px;
   height: 8px;
-  background: #667eea;
   border-radius: 50%;
-  box-shadow: 0 0 12px #667eea;
-  animation: pulse 2s ease-in-out infinite;
+  background: var(--primary);
+  position: relative;
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.hero-badge-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.35;
+  animation: hero-pulse 2s ease-out infinite;
 }
 
+@keyframes hero-pulse {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* 主标题：响应式缩放，目标 48px / 700 */
 .hero-title {
-  font-size: 56px;
-  line-height: 1.2;
-  font-weight: 800;
-  margin: 0 0 24px;
-  letter-spacing: -1px;
-  color: #1a1a2e;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+  color: var(--foreground);
 }
 
-.highlight {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.hero-title-accent {
+  color: var(--primary);
 }
 
+/* 副标题：18px / muted */
 .hero-desc {
-  font-size: 17px;
-  line-height: 1.7;
-  color: #555;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  max-width: 540px;
   margin: 0 0 32px;
 }
 
+/* 数据统计 */
 .hero-stats {
   display: flex;
-  align-items: center;
-  gap: 24px;
-  margin-bottom: 40px;
-  padding: 20px 28px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 16px;
-  max-width: fit-content;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
 }
 
-.stat-item {
-  text-align: center;
+.hero-stat {
+  flex: 1;
+  min-width: 120px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
 }
 
-.stat-num {
-  font-size: 26px;
+.hero-stat-value {
+  font-size: 24px;
   font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--primary);
+  letter-spacing: -0.01em;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: #888;
+.hero-stat-label {
+  font-size: 13px;
+  color: var(--muted-foreground);
   margin-top: 2px;
 }
 
-.stat-divider {
-  width: 1px;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.1);
-}
-
+/* 双 CTA 按钮容器 */
 .hero-cta {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
-.hero-cta :deep(.ant-btn-primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
-  height: 48px;
-  padding: 0 28px;
-  font-size: 15px;
-  font-weight: 500;
+/* ========== Section 通用 ========== */
+.section {
+  padding: 96px 0;
 }
 
-.hero-cta :deep(.ant-btn-primary):hover,
-.hero-cta :deep(.ant-btn-primary):focus {
-  background: linear-gradient(135deg, #5a72e0 0%, #6a3f95 100%);
-  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
-  transform: translateY(-1px);
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
 }
 
-.hero-cta :deep(.ant-btn-background-ghost) {
-  border-color: #667eea;
-  color: #667eea;
-  height: 48px;
-  padding: 0 28px;
-  font-size: 15px;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(6px);
+.section-head {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 56px;
 }
 
-.hero-cta :deep(.ant-btn-background-ghost):hover,
-.hero-cta :deep(.ant-btn-background-ghost):focus {
-  border-color: #5a72e0;
-  color: #5a72e0;
-  background: rgba(255, 255, 255, 0.85);
+.section-eyebrow {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
 }
 
-/* ========== 认证卡片 ========== */
-.auth-card {
+.section-title {
+  font-size: clamp(28px, 3.5vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin: 0 0 12px;
+}
+
+.section-sub {
+  font-size: 16px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ========== 功能入口卡片：3 列网格 ========== */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+/* 卡片：白底 + 1px border + 16px 圆角 + shadow-sm，hover 上浮 */
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 28px 24px;
+  cursor: pointer;
   position: relative;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: 24px;
-  padding: 36px 32px;
-  box-shadow: 0 32px 80px rgba(102, 126, 234, 0.18),
-    0 12px 32px rgba(31, 38, 135, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.6);
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.auth-card::before {
+/* 卡片顶部装饰条 */
+.feature-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--brand-400));
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.auth-card-header {
-  margin-bottom: 24px;
-}
-
-.auth-tabs {
-  position: relative;
-  display: flex;
-  background: #f5f5f7;
-  border-radius: 12px;
-  padding: 4px;
-}
-
-.auth-tab {
-  flex: 1;
-  position: relative;
-  z-index: 2;
-  padding: 10px 0;
-  background: transparent;
-  border: none;
-  font-size: 15px;
-  font-weight: 600;
-  color: #888;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.auth-tab.active {
-  color: #fff;
-}
-
-.auth-tab-indicator {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: calc(50% - 4px);
-  height: calc(100% - 8px);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.auth-tab-indicator.indicator-right {
-  transform: translateX(100%);
-}
-
-.auth-form {
-  animation: fadeIn 0.4s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.auth-form :deep(.ant-form-item) {
-  margin-bottom: 16px;
-}
-
-/* 独立输入框（无前缀图标）与外层 affix 包裹容器统一高度 */
-.auth-form :deep(.ant-input-affix-wrapper),
-.auth-form :deep(> * .ant-input:not(.ant-input-affix-wrapper .ant-input)) {
-  border-radius: 10px;
-}
-
-.auth-form :deep(.ant-input-affix-wrapper) {
-  height: 44px;
-  display: flex;
-  align-items: center;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-/* 独立输入框（如无 prefix 的场景）保持固定高度 */
-.auth-form :deep(.ant-input:not(.ant-input-affix-wrapper .ant-input)) {
-  height: 44px;
-  border-radius: 10px;
-}
-
-/* affix 包裹内部真实 input 不再设固定高度，交由 flex 垂直居中，修复 placeholder 错位 */
-.auth-form :deep(.ant-input-affix-wrapper > .ant-input) {
-  height: auto;
-  line-height: 1.5;
-  background: transparent;
-}
-
-/* 输入框统一玻璃质感底色与柔和边框 */
-.auth-form :deep(.ant-input-affix-wrapper),
-.auth-form :deep(.ant-input:not(.ant-input-affix-wrapper .ant-input)) {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(102, 126, 234, 0.16);
-  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
-}
-
-.auth-form :deep(.ant-input-affix-wrapper .ant-input-prefix) {
-  margin-inline-end: 10px;
-}
-
-.auth-form :deep(.ant-btn-primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  height: 44px;
-  border-radius: 10px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.auth-form :deep(.ant-btn-primary):hover,
-.auth-form :deep(.ant-btn-primary):focus {
-  background: linear-gradient(135deg, #5a72e0 0%, #6a3f95 100%);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-}
-
-/* 输入框聚焦态：覆盖全局蓝色为紫色主题 */
-.auth-form :deep(.ant-input:focus),
-.auth-form :deep(.ant-input-focused),
-.auth-form :deep(.ant-input-affix-wrapper:focus),
-.auth-form :deep(.ant-input-affix-wrapper-focused) {
-  border-color: #667eea !important;
-  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2) !important;
-}
-
-.auth-form :deep(.ant-input-affix-wrapper):hover {
-  border-color: #667eea !important;
-}
-
-.input-icon {
-  color: #bfbfbf;
-}
-
-.auth-switch {
-  text-align: center;
-  color: #999;
-  font-size: 13px;
-}
-
-.auth-switch a {
-  color: #667eea;
-  cursor: pointer;
-  margin-left: 4px;
-}
-
-.auth-switch a:hover {
-  color: #5a72e0;
-  text-decoration: underline;
-}
-
-/* ========== 通用 section 样式 ========== */
-.section-inner {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 100px 32px;
-}
-
-.section-header {
-  text-align: center;
-  margin-bottom: 64px;
-}
-
-.section-tag {
-  display: inline-block;
-  padding: 6px 16px;
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 100px;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-size: 40px;
-  font-weight: 800;
-  margin: 0 0 16px;
-  letter-spacing: -0.5px;
-  color: #1a1a2e;
-}
-
-.section-desc {
-  font-size: 16px;
-  color: #777;
-  max-width: 600px;
-  margin: 0 auto;
-  line-height: 1.7;
-}
-
-/* ========== 功能特性区 ========== */
-.features {
-  background: #fff;
-}
-
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-.feature-card {
-  padding: 36px;
-  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
-  border: 1px solid #f0f0f5;
-  border-radius: 20px;
-  transition: all 0.3s;
+.feature-card:hover::before {
+  opacity: 1;
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 48px rgba(102, 126, 234, 0.12);
-  border-color: rgba(102, 126, 234, 0.2);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--brand-200);
 }
 
+/* 卡片图标：56x56 渐变圆角方块 */
 .feature-icon {
   width: 56px;
   height: 56px;
   border-radius: 16px;
-  display: flex;
+  background: linear-gradient(135deg, var(--primary), var(--brand-600));
+  color: var(--primary-foreground);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
   font-size: 26px;
   margin-bottom: 20px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 20px rgba(0, 122, 255, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.feature-card:hover .feature-icon {
+  transform: scale(1.06);
+}
+
+.feature-body {
+  flex: 1;
 }
 
 .feature-title {
   font-size: 22px;
   font-weight: 700;
-  margin: 0 0 12px;
-  color: #1a1a2e;
+  color: var(--foreground);
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
 }
 
 .feature-desc {
-  font-size: 15px;
-  color: #666;
-  line-height: 1.7;
-  margin: 0 0 20px;
-}
-
-.feature-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.feature-list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
   font-size: 14px;
-  color: #555;
+  color: var(--muted-foreground);
+  line-height: 1.65;
+  margin: 0 0 4px;
 }
 
-.check-icon {
-  color: #52c41a;
-  font-size: 16px;
+/* 卡片底部箭头：hover 时右移 4px */
+.feature-arrow {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.2s ease;
+}
+
+.feature-arrow::after {
+  content: '查看详情';
+  margin-right: 6px;
+}
+
+.feature-card:hover .feature-arrow {
+  transform: translateX(4px);
+}
+
+/* 功能卡片特性标签 */
+.feature-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 14px;
+}
+
+.feature-tag {
+  padding: 3px 10px;
+  background: var(--brand-50);
+  color: var(--primary);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* 功能卡片亮点列表 */
+.feature-highlights {
+  list-style: none;
+  padding: 14px 14px;
+  margin: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--background-50);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.feature-highlights li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+
+.feature-check {
+  color: var(--success);
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ========== 核心能力区 ========== */
+.section-tint {
+  background: var(--background-100);
+}
+
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.capability-card {
+  display: flex;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.capability-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand-200);
+}
+
+.capability-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--brand-50);
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
   flex-shrink: 0;
 }
 
-/* ========== 使用流程区 ========== */
-.workflow {
-  background: linear-gradient(180deg, #fafbff 0%, #f5f7ff 100%);
-}
-
-.workflow-steps {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 32px;
-  position: relative;
-}
-
-.step-item {
-  position: relative;
-  padding: 32px;
-  background: #fff;
-  border-radius: 20px;
-  border: 1px solid #f0f0f5;
-  transition: all 0.3s;
-}
-
-.step-item:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(102, 126, 234, 0.1);
-}
-
-.step-num {
-  font-size: 36px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 16px;
-  line-height: 1;
-}
-
-.step-line {
-  position: absolute;
-  top: 48px;
-  right: -20px;
-  width: 40px;
-  height: 2px;
-  background: linear-gradient(90deg, #667eea, transparent);
-  z-index: 1;
-}
-
-.step-title {
-  font-size: 18px;
+.capability-title {
+  font-size: 16px;
   font-weight: 700;
-  margin: 0 0 10px;
-  color: #1a1a2e;
+  color: var(--foreground);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
 }
 
-.step-desc {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.7;
+.capability-desc {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  line-height: 1.55;
   margin: 0;
 }
 
-/* ========== FAQ ========== */
-.faq {
-  background: #fff;
-}
-
-.faq :deep(.ant-collapse) {
-  max-width: 800px;
-  margin: 0 auto;
-  background: transparent;
-}
-
-.faq :deep(.ant-collapse-item) {
-  margin-bottom: 16px;
-  border: 1px solid #f0f0f5 !important;
-  border-radius: 16px !important;
-  overflow: hidden;
-  background: #fff;
-  transition: all 0.3s;
-}
-
-.faq :deep(.ant-collapse-item:hover) {
-  border-color: rgba(102, 126, 234, 0.3) !important;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.08);
-}
-
-.faq :deep(.ant-collapse-header) {
-  padding: 20px 24px !important;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a2e;
-  align-items: center !important;
-}
-
-.faq :deep(.ant-collapse-arrow) {
-  color: #667eea !important;
-}
-
-.faq :deep(.ant-collapse-item-active) .ant-collapse-header {
-  color: #667eea !important;
-}
-
-.faq :deep(.ant-collapse-content) {
-  padding: 0 24px 20px !important;
-  border-top: 1px solid #f5f5f5;
-  background: #fff !important;
-}
-
-.faq-answer {
-  margin: 16px 0 0;
-  color: #666;
-  line-height: 1.7;
-  font-size: 14px;
-}
-
-/* ========== CTA 区 ========== */
-.cta-section {
-  padding: 80px 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+/* ========== 数据成果区（深色渐变） ========== */
+.section-grad {
+  background: linear-gradient(135deg, #0a2540 0%, #1e3a8a 50%, #007aff 100%);
+  color: #fff;
   position: relative;
   overflow: hidden;
 }
 
-.cta-section::before {
+.section-grad::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  right: -200px;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.section-grad::after {
+  content: '';
+  position: absolute;
+  bottom: -150px;
+  left: -150px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: rgba(52, 199, 89, 0.12);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.section-head-light {
+  position: relative;
+  z-index: 1;
+}
+
+.section-eyebrow-light {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.section-title-light {
+  color: #fff;
+}
+
+.section-sub-light {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.achievement-card {
+  text-align: center;
+  padding: 32px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.achievement-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.achievement-value {
+  font-size: 44px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.achievement-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.achievement-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.4;
+}
+
+/* ========== 用户证言区 ========== */
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.testimonial-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.testimonial-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand-200);
+}
+
+.testimonial-stars {
+  display: flex;
+  gap: 2px;
+  color: #ffb800;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.testimonial-quote {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--foreground);
+  margin: 0 0 18px;
+  flex: 1;
+  font-style: italic;
+}
+
+.testimonial-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.testimonial-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--background-200);
+}
+
+.testimonial-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.testimonial-role {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+/* ========== 使用流程：4 步时间轴 ========== */
+.section-alt {
+  position: relative;
+  background: var(--background-100);
+}
+
+/* 带写实摄影背景的 section */
+.section-photo {
+  position: relative;
+  background: var(--background);
+}
+
+.section-bg-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.12;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.section-photo .container,
+.section-alt .container {
+  position: relative;
+  z-index: 1;
+}
+
+/* 在带背景的 section 上叠加白色遮罩，保证内容可读 */
+.section-photo::after,
+.section-alt::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    circle at 20% 50%,
-    rgba(255, 255, 255, 0.15) 0%,
-    transparent 50%
-  );
+  background: linear-gradient(180deg, var(--background) 0%, rgba(255, 255, 255, 0.85) 50%, var(--background) 100%);
+  z-index: 0;
+  pointer-events: none;
 }
 
-.cta-inner {
+.workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+.workflow-card {
   position: relative;
-  max-width: 800px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.workflow-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand-200);
+}
+
+/* 序号 + 连接线容器 */
+.workflow-index {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+  height: 32px;
+}
+
+.workflow-index-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.workflow-index-line {
+  flex: 1;
+  height: 2px;
+  margin-left: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--brand-300) 0%,
+    var(--border) 100%
+  );
+  border-radius: 1px;
+}
+
+.workflow-content {
+  flex: 1;
+}
+
+.workflow-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--brand-50);
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 14px;
+}
+
+.workflow-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.workflow-desc {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.workflow-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.workflow-points li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.workflow-points li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.7;
+}
+
+/* ========== 常见问题：折叠面板 ========== */
+.container-narrow {
+  max-width: 820px;
+}
+
+.faq-collapse {
+  background: transparent;
+}
+
+.faq-collapse :deep(.ant-collapse-item) {
+  background: var(--card);
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.faq-collapse :deep(.ant-collapse-item:hover) {
+  border-color: var(--brand-200) !important;
+}
+
+.faq-collapse :deep(.ant-collapse-item-active) {
+  border-color: var(--brand-200) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.faq-collapse :deep(.ant-collapse-header) {
+  padding: 18px 22px !important;
+  align-items: center !important;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground) !important;
+}
+
+.faq-collapse :deep(.ant-collapse-content-box) {
+  padding: 0 22px 18px !important;
+}
+
+.faq-collapse :deep(.ant-collapse-arrow) {
+  color: var(--muted-foreground) !important;
+  font-size: 13px !important;
+}
+
+.faq-answer {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+
+/* FAQ 底部 CTA */
+.faq-cta {
+  margin-top: 32px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
-.cta-title {
-  font-size: 36px;
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 16px;
-}
-
-.cta-desc {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.85);
-  margin: 0 0 32px;
-}
-
-.cta-btn {
-  height: 48px !important;
-  padding: 0 36px !important;
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  background: #fff !important;
-  color: #667eea !important;
-  border: none !important;
-  border-radius: 100px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
-}
-
-.cta-btn:hover,
-.cta-btn:focus {
-  transform: translateY(-2px);
-  background: #fff !important;
-  color: #5a72e0 !important;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25) !important;
+.faq-cta-text {
+  font-size: 14px;
+  color: var(--muted-foreground);
 }
 
 /* ========== 页脚 ========== */
 .footer {
-  background: #1a1a2e;
-  padding: 48px 32px;
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--background-800);
+  padding: 56px 0 32px;
 }
 
-.footer-inner {
-  max-width: 1280px;
-  margin: 0 auto;
-  text-align: center;
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px;
+  margin-bottom: 32px;
+}
+
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-col-brand {
+  gap: 8px;
 }
 
 .footer-brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .footer-logo {
   width: 28px;
   height: 28px;
+  border-radius: 7px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
 }
 
 .footer-brand span {
-  font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  font-size: 16px;
+  color: var(--text-50);
 }
 
-.footer-text {
-  margin: 0 0 8px;
+.footer-tagline {
+  color: var(--text-300);
   font-size: 14px;
+  margin: 0;
 }
 
 .footer-copy {
-  margin: 0;
+  color: var(--text-400);
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  margin: 8px 0 0;
+}
+
+.footer-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-50);
+  margin: 0 0 10px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.footer-col a {
+  color: var(--text-300);
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 3px 0;
+}
+
+.footer-col a:hover {
+  color: var(--primary);
+}
+
+/* ========== 认证弹窗 ========== */
+.auth-modal :deep(.ant-modal-content) {
+  border-radius: var(--radius-lg);
+  padding: 32px 28px 24px;
+  background: var(--card);
+  box-shadow: var(--shadow-2xl);
+}
+
+.auth-modal :deep(.ant-modal-close) {
+  top: 16px;
+  right: 16px;
+  color: var(--muted-foreground);
+}
+
+.auth-modal-body {
+  width: 100%;
+}
+
+.auth-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.auth-modal-sub {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 0 0 24px;
+}
+
+/* 登录 / 注册 切换 tabs：胶囊分段控件 */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--background-200);
+  border-radius: 980px;
+  margin-bottom: 24px;
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  border-radius: 980px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auth-tab-active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 表单样式覆盖 */
+.auth-form :deep(.ant-form-item) {
+  margin-bottom: 16px;
+}
+
+.auth-form :deep(.ant-form-item-label > label) {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.auth-form :deep(.ant-input-affix-wrapper),
+.auth-form :deep(.ant-input) {
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  background: var(--background-50);
+  color: var(--foreground);
+}
+
+.auth-form :deep(.ant-input-affix-wrapper:hover) {
+  border-color: var(--primary);
+}
+
+.auth-form :deep(.ant-input-affix-wrapper:focus),
+.auth-form :deep(.ant-input-affix-wrapper-focused) {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12) !important;
+}
+
+.auth-form :deep(.ant-input::placeholder) {
+  color: var(--muted-foreground);
+}
+
+.input-icon {
+  color: var(--muted-foreground);
+}
+
+/* 提交按钮：100% 宽度 */
+.auth-submit {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-submit.is-loading {
+  opacity: 0.75;
+}
+
+.auth-switch {
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.auth-switch a {
+  color: var(--primary);
+  cursor: pointer;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.auth-switch a:hover {
+  color: var(--brand-600);
 }
 
 /* ========== 响应式 ========== */
-@media (max-width: 1024px) {
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: 48px;
+/* 768-1023px：2 列网格 */
+@media (max-width: 1023px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .auth-card {
-    max-width: 440px;
+  .workflow-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 第 2 个卡片后隐藏连接线，避免 2x2 布局错位 */
+  .workflow-card:nth-child(2) .workflow-index-line,
+  .workflow-card:nth-child(4) .workflow-index-line {
+    display: none;
+  }
+
+  /* Hero 右侧预览区在小屏隐藏，左内容居中 */
+  .hero-right {
+    display: none;
+  }
+
+  .hero-container {
+    justify-content: center;
+  }
+
+  .hero-left {
+    max-width: 640px;
+    flex: 1 1 auto;
+  }
+
+  /* 核心能力 2 列 */
+  .capability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 数据成果 2 列 */
+  .achievement-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 证言 2 列 */
+  .testimonial-grid {
+    grid-template-columns: 1fr;
+    max-width: 560px;
     margin: 0 auto;
   }
 
-  .hero-title {
-    font-size: 44px;
+  /* Footer 调整 */
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+
+/* <768px：1 列网格，Hero 标题缩放 */
+@media (max-width: 767px) {
+  .nav-links {
+    display: none;
+  }
+
+  .hero {
+    padding: 88px 0 56px;
+    min-height: auto;
+  }
+
+  .hero-stats {
+    flex-direction: column;
+  }
+
+  .hero-stat {
+    min-width: 0;
+  }
+
+  .hero-cta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-cta .btn-lg {
+    width: 100%;
   }
 
   .feature-grid {
     grid-template-columns: 1fr;
   }
 
-  .workflow-steps {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .step-line {
-    display: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .nav-links {
-    display: none;
-  }
-
-  .hero {
-    padding: 100px 20px 60px;
-  }
-
-  .hero-title {
-    font-size: 34px;
-  }
-
-  .hero-stats {
-    padding: 16px 20px;
-    gap: 16px;
-  }
-
-  .stat-num {
-    font-size: 20px;
-  }
-
-  .hero-cta {
-    flex-direction: column;
-  }
-
-  .section-inner {
-    padding: 64px 20px;
-  }
-
-  .section-title {
-    font-size: 28px;
-  }
-
-  .workflow-steps {
+  .workflow-grid {
     grid-template-columns: 1fr;
   }
 
-  .cta-title {
-    font-size: 26px;
+  /* 单列布局下隐藏所有连接线 */
+  .workflow-index-line {
+    display: none;
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  /* 核心能力 1 列 */
+  .capability-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* 数据成果 2 列（保持紧凑） */
+  .achievement-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .achievement-card {
+    padding: 24px 12px;
+  }
+
+  .achievement-value {
+    font-size: 36px;
+  }
+
+  /* Footer 单列 */
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
+
+/* ========== 减少动效（无障碍） ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 </style>

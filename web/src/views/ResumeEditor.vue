@@ -3,7 +3,7 @@
     <aside v-if="demoMode" class="product-sidebar" aria-label="产品导航">
       <button class="sidebar-brand" type="button" @click="router.push('/')">
         <span class="sidebar-logo">职</span>
-        <span><strong>职途AI</strong><small>智能求职工作台</small></span>
+        <span><strong>职途</strong><small>智能求职工作台</small></span>
       </button>
       <nav class="product-nav">
         <button class="active" type="button" aria-current="page">
@@ -77,16 +77,22 @@
     <main class="lab-workspace">
       <aside class="editor-panel">
         <div class="panel-tabs">
-          <button class="active" type="button">结构化编辑</button>
-          <button type="button" @click="showRawJson = !showRawJson">{{ showRawJson ? '返回表单' : '查看 JSON' }}</button>
+          <button
+            type="button"
+            :class="{ active: editorTab === 'edit' }"
+            @click="editorTab = 'edit'"
+          >结构化编辑</button>
+          <button
+            type="button"
+            :class="{ active: editorTab === 'smart' }"
+            @click="editorTab = 'smart'"
+          >
+            <BulbOutlined /> 智能完善
+          </button>
         </div>
 
-        <div v-if="showRawJson" class="raw-json-panel">
-          <div class="panel-hint">当前结构化数据会同步生成版本 JSON</div>
-          <pre>{{ serializedContent }}</pre>
-        </div>
-
-        <div v-else class="editor-scroll">
+        <!-- 结构化编辑 -->
+        <div v-if="editorTab === 'edit'" class="editor-scroll">
           <div class="panel-hint">填写内容后，右侧 A4 简历会即时更新</div>
 
           <section class="form-section" :class="{ collapsed: collapsed.personal }">
@@ -216,6 +222,217 @@
             </div>
           </section>
         </div>
+
+        <!-- 智能完善（与结构化编辑同面板切换） -->
+        <div v-if="editorTab === 'smart'" class="editor-scroll smart-pane-wrap">
+          <!-- 智能完善子 tabs -->
+          <div class="smart-tabs">
+            <button
+              v-for="t in smartTabs"
+              :key="t.key"
+              class="smart-tab-btn"
+              :class="{ active: activeSmartTab === t.key }"
+              type="button"
+              @click="activeSmartTab = t.key"
+            >
+              <component :is="t.icon" />
+              <span>{{ t.label }}</span>
+            </button>
+          </div>
+
+          <!-- AI 大模型分析 -->
+          <div v-if="activeSmartTab === 'analysis'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">简历内容分析</span>
+              <button class="mini-btn" type="button" @click="runAnalysis" :disabled="analysisLoading">
+                <LoadingOutlined v-if="analysisLoading" />
+                <ReloadOutlined v-else />
+                {{ analysisLoading ? '分析中…' : '重新分析' }}
+              </button>
+            </div>
+
+            <div class="score-overview">
+              <div class="score-ring">
+                <svg viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e8ece8" stroke-width="6" />
+                  <circle
+                    cx="40" cy="40" r="34" fill="none"
+                    stroke="url(#scoreGrad)" stroke-width="6"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${(analysisScore / 100) * 213.6} 213.6`"
+                    transform="rotate(-90 40 40)"
+                  />
+                  <defs>
+                    <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#087443" />
+                      <stop offset="100%" stop-color="#34c759" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div class="score-num">{{ analysisScore }}<small>/100</small></div>
+              </div>
+              <div class="score-meta">
+                <strong>{{ analysisScoreLabel }}</strong>
+                <p>{{ analysisScoreDesc }}</p>
+              </div>
+            </div>
+
+            <section class="dim-card">
+              <h4>多维度评分</h4>
+              <div v-for="d in analysisDimensions" :key="d.label" class="dim-row">
+                <span class="dim-label">{{ d.label }}</span>
+                <div class="dim-track"><i :style="{ width: `${d.value}%`, background: d.color }" /></div>
+                <b :style="{ color: d.color }">{{ d.value }}</b>
+              </div>
+            </section>
+
+            <section class="dim-card">
+              <h4>亮点</h4>
+              <div v-if="analysisHighlights.length" class="hl-list">
+                <article v-for="(h, i) in analysisHighlights" :key="i" class="hl-item hl-good">
+                  <CheckCircleOutlined />
+                  <div><strong>{{ h.title }}</strong><p>{{ h.detail }}</p></div>
+                </article>
+              </div>
+              <a-empty v-else :image="null" description="暂无亮点" />
+            </section>
+
+            <section class="dim-card">
+              <h4>待补强项</h4>
+              <div v-if="analysisWeakness.length" class="hl-list">
+                <article v-for="(w, i) in analysisWeakness" :key="i" class="hl-item hl-bad">
+                  <ExclamationCircleOutlined />
+                  <div>
+                    <strong>{{ w.title }}</strong><p>{{ w.detail }}</p>
+                    <button v-if="w.action" class="link-btn" type="button" @click="w.action">{{ w.actionLabel || '立即完善' }}</button>
+                  </div>
+                </article>
+              </div>
+              <a-empty v-else :image="null" description="简历已经比较完善" />
+            </section>
+          </div>
+
+          <!-- JD 智能匹配 -->
+          <div v-if="activeSmartTab === 'jd'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">岗位描述匹配</span>
+              <button class="mini-btn primary" type="button" @click="runJdMatch" :disabled="jdLoading">
+                <LoadingOutlined v-if="jdLoading" />
+                <ThunderboltOutlined v-else />
+                {{ jdLoading ? '匹配中…' : '开始匹配' }}
+              </button>
+            </div>
+
+            <label class="jd-textarea-wrap">
+              <textarea
+                v-model="targetJd"
+                rows="6"
+                placeholder="粘贴目标岗位 JD（职位描述、要求、加分项），AI 会自动提取关键词并计算匹配度"
+              />
+              <span class="jd-counter">{{ targetJd.length }} 字</span>
+            </label>
+
+            <div v-if="jdMatchResult" class="jd-result">
+              <div class="jd-match-ring">
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e8ece8" stroke-width="8" />
+                  <circle
+                    cx="50" cy="50" r="42" fill="none"
+                    :stroke="jdMatchColor" stroke-width="8"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${(jdMatchResult.matchRate / 100) * 263.9} 263.9`"
+                    transform="rotate(-90 50 50)"
+                  />
+                </svg>
+                <div class="jd-match-num">
+                  <strong>{{ jdMatchResult.matchRate }}%</strong>
+                  <small>{{ jdMatchLabel }}</small>
+                </div>
+              </div>
+
+              <div class="jd-stats">
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num green">{{ jdMatchResult.matched.length }}</span>
+                  <span class="jd-stat-label">已匹配关键词</span>
+                </div>
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num red">{{ jdMatchResult.missing.length }}</span>
+                  <span class="jd-stat-label">缺失关键词</span>
+                </div>
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num blue">{{ jdMatchResult.suggest.length }}</span>
+                  <span class="jd-stat-label">建议补充</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>已匹配 <small>简历中已包含</small></h5>
+                <div class="kw-tags">
+                  <span v-for="k in jdMatchResult.matched" :key="k" class="kw-tag kw-green">{{ k }}</span>
+                  <span v-if="!jdMatchResult.matched.length" class="kw-empty">暂无</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>缺失关键词 <small>JD 中出现但简历未提及</small></h5>
+                <div class="kw-tags">
+                  <span v-for="k in jdMatchResult.missing" :key="k" class="kw-tag kw-red">{{ k }}</span>
+                  <span v-if="!jdMatchResult.missing.length" class="kw-empty">无缺失</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>AI 建议 <small>基于差距分析</small></h5>
+                <article v-for="(s, i) in jdMatchResult.suggest" :key="i" class="suggest-item">
+                  <b>{{ i + 1 }}</b>
+                  <div><strong>{{ s.title }}</strong><p>{{ s.detail }}</p></div>
+                </article>
+                <a-empty v-if="!jdMatchResult.suggest.length" :image="null" description="匹配良好，无补充建议" />
+              </div>
+            </div>
+
+            <div v-else class="jd-empty">
+              <FileSearchOutlined />
+              <p>粘贴 JD 后点击「开始匹配」</p>
+            </div>
+          </div>
+
+          <!-- AI 一键优化 -->
+          <div v-if="activeSmartTab === 'optimize'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">AI 内容优化</span>
+            </div>
+
+            <div class="opt-section">
+              <h4>批量优化</h4>
+              <p class="opt-desc">点击下方按钮，AI 会根据内容自动强化措辞、补充量化指标、提升专业度</p>
+              <div class="opt-actions">
+                <button class="opt-btn" type="button" @click="optimizeAll" :disabled="optimizeLoading">
+                  <LoadingOutlined v-if="optimizeLoading" />
+                  <ThunderboltOutlined v-else />
+                  {{ optimizeLoading ? 'AI 优化中…' : '一键优化全部内容' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="opt-section">
+              <h4>逐项优化</h4>
+              <article v-for="item in optimizeItems" :key="item.key" class="opt-item">
+                <div class="opt-item-head">
+                  <strong>{{ item.title }}</strong>
+                  <span class="opt-item-status" :class="item.statusClass">{{ item.statusText }}</span>
+                </div>
+                <p class="opt-item-desc">{{ item.desc }}</p>
+                <button class="link-btn" type="button" @click="item.run" :disabled="item.loading">
+                  <LoadingOutlined v-if="item.loading" />
+                  {{ item.loading ? '处理中…' : item.buttonText }}
+                </button>
+              </article>
+            </div>
+          </div>
+
+          <p class="privacy-note"><SafetyCertificateOutlined /> 简历内容仅用于当前编辑与诊断，不会上传至第三方</p>
+        </div>
       </aside>
 
       <section class="preview-stage">
@@ -228,7 +445,7 @@
             id="resume-paper"
             class="resume-paper"
             :class="[`template-${templateStyle}`, `font-${fontFamily}`, `density-${density}`]"
-            :style="{ transform: `scale(${zoom / 100})` }"
+            :style="{ zoom: zoom / 100 }"
           >
             <header v-if="isVisible('personal')" class="paper-header">
               <h1>{{ resumeContent.personal.name || '你的姓名' }}</h1>
@@ -283,42 +500,6 @@
           </article>
         </div>
       </section>
-
-      <aside class="ai-panel">
-        <div class="ai-heading">
-          <div><span class="ai-kicker">AI 诊断</span><h2>针对 {{ resumeContent.intention.position || '目标岗位' }}</h2></div>
-          <RobotOutlined />
-        </div>
-
-        <section class="match-card">
-          <span>JD 匹配度</span>
-          <div class="score-line"><strong>{{ diagnosticScore }}%</strong><em>{{ diagnosticScore >= 80 ? '较好' : '待完善' }}</em></div>
-          <div class="score-track"><i :style="{ width: `${diagnosticScore}%` }" /></div>
-          <small>基于完整度、成果量化和关键词覆盖估算</small>
-        </section>
-
-        <section class="dimension-card">
-          <h3>六维评估</h3>
-          <div v-for="item in dimensions" :key="item.label" class="dimension-row">
-            <span>{{ item.label }}</span><div><i :style="{ width: `${item.value}%` }" /></div><b>{{ item.value }}</b>
-          </div>
-        </section>
-
-        <section class="suggestion-card">
-          <h3>优化建议 <span>{{ suggestions.length }}</span></h3>
-          <article v-for="(item, index) in suggestions" :key="item.title">
-            <b>{{ index + 1 }}</b>
-            <div><strong>{{ item.title }}</strong><p>{{ item.detail }}</p></div>
-          </article>
-        </section>
-
-        <label class="jd-field">
-          <span>目标 JD</span>
-          <textarea v-model="targetJd" rows="5" placeholder="粘贴岗位描述，诊断会随内容更新" />
-        </label>
-        <button class="optimize-button" type="button" @click="handleOptimize"><RobotOutlined /> 根据 JD 一键优化</button>
-        <p class="privacy-note"><SafetyCertificateOutlined /> 简历内容仅用于当前编辑与诊断</p>
-      </aside>
     </main>
 
     <a-drawer v-model:open="versionDrawerOpen" title="版本历史" width="380">
@@ -342,7 +523,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
@@ -351,8 +532,11 @@ import {
   FontSizeOutlined, HistoryOutlined, LayoutOutlined, PlusOutlined, ProjectOutlined, CommentOutlined,
   ReadOutlined, RobotOutlined, SafetyCertificateOutlined, SaveOutlined, ToolOutlined,
   UserOutlined, SendOutlined,
+  ReloadOutlined, LoadingOutlined, ThunderboltOutlined, ExclamationCircleOutlined,
+  FileSearchOutlined, BulbOutlined, RocketOutlined,
 } from '@ant-design/icons-vue'
 import { useResumeStore } from '@/stores/resume'
+import { useUserProfileStore } from '@/stores/userProfile'
 import { getResumeTemplate, resumeTemplates, type ResumeTemplateId } from '@/data/resumeTemplates'
 import type { ResumeVersion } from '@/types/models'
 
@@ -371,6 +555,7 @@ interface ResumeContent {
 const route = useRoute()
 const router = useRouter()
 const resumeStore = useResumeStore()
+const userProfileStore = useUserProfileStore()
 const demoMode = computed(() => route.name === 'ResumeLabPreview' || route.query.demo === '1')
 const resumeId = computed(() => Number(route.params.id))
 const editableName = ref('后端工程师－张明')
@@ -378,12 +563,11 @@ const templateStyle = ref<ResumeTemplateId>('classic')
 const fontFamily = ref('sans')
 const density = ref('comfortable')
 const zoom = ref(82)
-const showRawJson = ref(false)
 const versionDrawerOpen = ref(false)
 const showSaveVersionModal = ref(false)
 const savingVersion = ref(false)
 const newVersionNote = ref('')
-const targetJd = ref('负责高并发业务系统设计与研发；熟悉 Go、Java、MySQL、Redis、消息队列与微服务架构；具备性能优化和工程化经验。')
+const targetJd = ref('')
 const collapsed = reactive<Record<string, boolean>>({ personal: false, intention: false, education: false, work: false, project: false, skills: false })
 const resumeContent = reactive<ResumeContent>(createSampleContent())
 
@@ -399,32 +583,318 @@ const contentStats = computed(() => ({
     + (resumeContent.module_visibility.skills !== false && resumeContent.skills.length ? 1 : 0),
 }))
 const intentionSummary = computed(() => [resumeContent.intention.position, resumeContent.intention.city, resumeContent.intention.salary, resumeContent.intention.arrival].filter(Boolean).join(' ｜ '))
-const diagnosticScore = computed(() => {
-  let score = 42
-  if (resumeContent.personal.phone && resumeContent.personal.email) score += 8
-  score += Math.min(12, resumeContent.education.length * 6)
-  score += Math.min(16, resumeContent.work.length * 8)
-  score += Math.min(14, resumeContent.project.length * 7)
-  if (resumeContent.skills.length >= 3) score += 8
-  return Math.min(score, 96)
+
+// ==================== 智能完善：AI 大模型分析 ====================
+type EditorTab = 'edit' | 'smart'
+const editorTab = ref<EditorTab>('edit')
+
+type SmartTabKey = 'analysis' | 'jd' | 'optimize'
+const activeSmartTab = ref<SmartTabKey>('analysis')
+
+const smartTabs = [
+  { key: 'analysis' as const, label: 'AI 分析', icon: BulbOutlined },
+  { key: 'jd' as const, label: 'JD 匹配', icon: FileSearchOutlined },
+  { key: 'optimize' as const, label: 'AI 优化', icon: RocketOutlined },
+]
+
+// —— 分析相关 ——
+const analysisLoading = ref(false)
+
+// 多维度评分（基于内容实时计算 + 模拟 AI 权重）
+const analysisDimensions = computed(() => {
+  const personal = resumeContent.personal
+  const edu = resumeContent.education
+  const work = resumeContent.work
+  const proj = resumeContent.project
+  const skills = resumeContent.skills
+
+  const contactComplete = [personal.name, personal.phone, personal.email, personal.city].filter(Boolean).length
+  const intentionComplete = [resumeContent.intention.position, resumeContent.intention.city, resumeContent.intention.salary].filter(Boolean).length
+
+  // 量化指标占比
+  const allDesc = [...work, ...proj].map((i) => i.description).join(' ')
+  const hasQuant = /[0-9]+(%|万|倍|ms|次|秒|分|倍|x|X)/.test(allDesc)
+  const quantCount = (allDesc.match(/[0-9]+(%|万|倍|ms|次|秒|分|x|X)/g) || []).length
+
+  return [
+    { label: '基本信息完整度', value: Math.min(98, 40 + contactComplete * 15), color: '#087443' },
+    { label: '求职意向清晰度', value: intentionComplete >= 3 ? 92 : 50 + intentionComplete * 14, color: '#007aff' },
+    { label: '教育背景', value: Math.min(95, 50 + edu.length * 22), color: '#5e5ce6' },
+    { label: '工作经历', value: Math.min(96, 45 + work.length * 18 + (hasQuant ? 8 : 0)), color: '#af52de' },
+    { label: '项目经验', value: Math.min(94, 42 + proj.length * 22 + (quantCount >= 3 ? 12 : 0)), color: '#ff9500' },
+    { label: '技能描述', value: Math.min(92, 48 + skills.length * 12), color: '#34c759' },
+  ]
 })
-const dimensions = computed(() => [
-  { label: '技能匹配', value: Math.min(96, 58 + resumeContent.skills.length * 8) },
-  { label: '项目经验', value: Math.min(94, 52 + resumeContent.project.length * 14) },
-  { label: '工作经历', value: Math.min(92, 54 + resumeContent.work.length * 16) },
-  { label: '教育背景', value: Math.min(90, 62 + resumeContent.education.length * 12) },
-  { label: '求职意向', value: resumeContent.intention.position && resumeContent.intention.city ? 88 : 48 },
-  { label: '关键词覆盖', value: targetJd.value ? 76 : 42 },
+
+const analysisScore = computed(() => {
+  const ds = analysisDimensions.value
+  return Math.round(ds.reduce((a, b) => a + b.value, 0) / ds.length)
+})
+
+const analysisScoreLabel = computed(() => {
+  const s = analysisScore.value
+  if (s >= 85) return '优秀'
+  if (s >= 70) return '良好'
+  if (s >= 55) return '中等'
+  return '待完善'
+})
+
+const analysisScoreDesc = computed(() => {
+  const s = analysisScore.value
+  if (s >= 85) return '简历内容完整且量化指标充足，仅需微调即可投递。'
+  if (s >= 70) return '整体表现不错，建议补充亮点项目与量化成果。'
+  if (s >= 55) return '基础信息已具备，但部分模块需进一步完善。'
+  return '简历内容较少，建议从基本信息、工作经历和项目经验开始完善。'
+})
+
+// 亮点分析
+const analysisHighlights = computed(() => {
+  const list: { title: string; detail: string }[] = []
+  const work = resumeContent.work
+  const proj = resumeContent.project
+  const allDesc = [...work, ...proj].map((i) => i.description).join(' ')
+  const quantCount = (allDesc.match(/[0-9]+(%|万|倍|ms|次|秒|分|x|X)/g) || []).length
+
+  if (quantCount >= 3) {
+    list.push({ title: '量化成果突出', detail: `已使用 ${quantCount} 处量化指标，能有效展示业务影响力。` })
+  }
+  if (proj.length >= 2) {
+    list.push({ title: '项目证据充分', detail: `共 ${proj.length} 个项目，能多角度展示技术能力。` })
+  }
+  if (work.length >= 2) {
+    list.push({ title: '工作经历稳定', detail: `${work.length} 段工作经历，体现持续成长。` })
+  }
+  if (resumeContent.skills.length >= 4) {
+    list.push({ title: '技能栈丰富', detail: `${resumeContent.skills.length} 项技能分类，覆盖面广。` })
+  }
+  return list
+})
+
+// 待补强项
+const analysisWeakness = computed(() => {
+  const list: {
+    title: string
+    detail: string
+    actionLabel?: string
+    action?: () => void
+  }[] = []
+  const work = resumeContent.work
+  const proj = resumeContent.project
+  const skills = resumeContent.skills
+  const allDesc = [...work, ...proj].map((i) => i.description).join(' ')
+  const hasQuant = /[0-9]+(%|万|倍|ms|次|秒|分)/.test(allDesc)
+
+  if (!resumeContent.intention.position) {
+    list.push({
+      title: '求职意向缺失',
+      detail: '未填写目标岗位，AI 难以做精准匹配。',
+      actionLabel: '填写意向',
+      action: () => { activeSmartTab.value = 'analysis'; message.info('请在左侧「求职意向」模块填写') },
+    })
+  }
+  if (!hasQuant) {
+    list.push({
+      title: '缺少量化成果',
+      detail: '工作与项目描述未使用数据指标，建议补充性能、规模、效率等量化结果。',
+      actionLabel: 'AI 优化',
+      action: () => { activeSmartTab.value = 'optimize' },
+    })
+  }
+  if (proj.length < 2) {
+    list.push({ title: '项目数量偏少', detail: `当前仅 ${proj.length} 个项目，建议补充 1-2 个能体现核心能力的项目。` })
+  }
+  if (skills.length < 3) {
+    list.push({ title: '技能描述单薄', detail: `仅 ${skills.length} 项技能，建议按「编程语言 / 框架 / 工具」分类补全。` })
+  }
+  if (!resumeContent.personal.email || !resumeContent.personal.phone) {
+    list.push({ title: '联系方式不全', detail: '邮箱或电话缺失，HR 无法联系到你。' })
+  }
+  return list
+})
+
+// 模拟 AI 分析（带 loading 动画）
+const runAnalysis = async () => {
+  analysisLoading.value = true
+  await new Promise((r) => setTimeout(r, 800))
+  analysisLoading.value = false
+  message.success('AI 分析已更新')
+}
+
+// ==================== JD 智能匹配 ====================
+const jdLoading = ref(false)
+interface JdMatchResult {
+  matchRate: number
+  matched: string[]
+  missing: string[]
+  suggest: { title: string; detail: string }[]
+}
+const jdMatchResult = ref<JdMatchResult | null>(null)
+
+// 关键词库（按技术栈分类，可扩展）
+const techKeywords = [
+  'Java', 'Go', 'Python', 'Node.js', 'C++', 'Rust', 'TypeScript', 'JavaScript',
+  'Spring Boot', 'Spring Cloud', 'Gin', 'React', 'Vue', 'Angular', 'Next.js',
+  'MySQL', 'PostgreSQL', 'Redis', 'MongoDB', 'ClickHouse', 'Elasticsearch', 'Kafka', 'RabbitMQ', 'RocketMQ',
+  'Docker', 'Kubernetes', 'K8s', 'Jenkins', 'CI/CD', 'Prometheus', 'Grafana',
+  '微服务', '分布式', '高并发', '高可用', '性能优化', '架构设计',
+  '消息队列', '缓存', '数据库优化', '系统设计', 'DDD', '领域驱动设计',
+  '机器学习', '深度学习', 'LLM', 'NLP', '推荐系统', '数据分析',
+  '团队管理', '项目管理', '敏捷开发', 'Scrum', 'OKR',
+  'Linux', 'Git', 'Shell', 'Python', '算法', '数据结构',
+  'TOEIC', '英语', 'PMP',
+]
+
+const runJdMatch = async () => {
+  if (!targetJd.value.trim()) {
+    message.warning('请先粘贴 JD 内容')
+    return
+  }
+  jdLoading.value = true
+  await new Promise((r) => setTimeout(r, 900))
+  // 提取 JD 中的关键词
+  const jdText = targetJd.value.toLowerCase()
+  const jdKeywords = techKeywords.filter((k) => jdText.includes(k.toLowerCase()))
+  // 简历全文
+  const resumeText = (
+    resumeContent.personal.name + ' ' +
+    resumeContent.intention.position + ' ' +
+    resumeContent.skills.map((s) => s.name).join(' ') + ' ' +
+    [...resumeContent.work, ...resumeContent.project].map((i) => i.description).join(' ')
+  ).toLowerCase()
+  const matched = jdKeywords.filter((k) => resumeText.includes(k.toLowerCase()))
+  const missing = jdKeywords.filter((k) => !resumeText.includes(k.toLowerCase()))
+
+  const matchRate = jdKeywords.length
+    ? Math.round((matched.length / jdKeywords.length) * 100)
+    : 50
+
+  const suggest: { title: string; detail: string }[] = []
+  if (missing.length > 0) {
+    suggest.push({
+      title: '补充技术关键词',
+      detail: `简历中未提及：${missing.slice(0, 5).join('、')}。如有相关经验，建议在技能或项目描述中体现。`,
+    })
+  }
+  if (matched.length > 0) {
+    suggest.push({
+      title: '突出已匹配项',
+      detail: `已匹配 ${matched.length} 个关键词，建议在项目经历中给出具体应用场景与量化结果。`,
+    })
+  }
+  if (matchRate < 60) {
+    suggest.push({ title: '匹配度偏低', detail: '考虑调整简历重点，或寻找更贴合的岗位。' })
+  } else if (matchRate >= 80) {
+    suggest.push({ title: '匹配良好', detail: '可重点准备面试，强化项目深度与亮点。' })
+  }
+
+  jdMatchResult.value = { matchRate, matched, missing, suggest }
+  jdLoading.value = false
+  message.success('JD 匹配完成')
+}
+
+const jdMatchColor = computed(() => {
+  const r = jdMatchResult.value?.matchRate ?? 0
+  if (r >= 80) return '#34c759'
+  if (r >= 60) return '#ff9500'
+  return '#ff3b30'
+})
+const jdMatchLabel = computed(() => {
+  const r = jdMatchResult.value?.matchRate ?? 0
+  if (r >= 80) return '匹配良好'
+  if (r >= 60) return '部分匹配'
+  return '匹配度低'
+})
+
+// ==================== AI 一键优化 ====================
+const optimizeLoading = ref(false)
+const optStatus = reactive<Record<string, 'idle' | 'loading' | 'done'>>({
+  work: 'idle', project: 'idle', skills: 'idle', summary: 'idle',
+})
+
+// 模拟 AI 优化：为经历描述补充量化指标
+const enhanceDescription = (text: string): string => {
+  if (!text) return text
+  if (/[0-9]+(%|万|倍|ms|次|秒|分)/.test(text)) return text
+  const lines = text.split('\n').filter(Boolean)
+  const quantifiers = ['提升 30%', '日均 100w+ 请求', '响应时间降低 40%', '可用性达 99.9%']
+  return lines.map((line, i) => `${line}，${quantifiers[i % quantifiers.length]}`).join('\n')
+}
+
+const optimizeItem = async (
+  key: keyof typeof optStatus,
+  apply: () => void,
+) => {
+  optStatus[key] = 'loading'
+  await new Promise((r) => setTimeout(r, 700))
+  apply()
+  optStatus[key] = 'done'
+  message.success('已应用 AI 优化')
+}
+
+const optimizeItems = computed(() => [
+  {
+    key: 'work',
+    title: '工作经历强化',
+    desc: 'AI 自动补充量化指标、业务影响力描述',
+    buttonText: '优化工作经历',
+    loading: optStatus.work === 'loading',
+    statusText: optStatus.work === 'done' ? '已优化' : (optStatus.work === 'loading' ? '处理中' : '待优化'),
+    statusClass: optStatus.work === 'done' ? 'st-done' : 'st-idle',
+    run: () => optimizeItem('work', () => {
+      resumeContent.work.forEach((w) => { w.description = enhanceDescription(w.description) })
+    }),
+  },
+  {
+    key: 'project',
+    title: '项目经历强化',
+    desc: '补充技术栈细节、性能指标与业务结果',
+    buttonText: '优化项目经历',
+    loading: optStatus.project === 'loading',
+    statusText: optStatus.project === 'done' ? '已优化' : (optStatus.project === 'loading' ? '处理中' : '待优化'),
+    statusClass: optStatus.project === 'done' ? 'st-done' : 'st-idle',
+    run: () => optimizeItem('project', () => {
+      resumeContent.project.forEach((p) => { p.description = enhanceDescription(p.description) })
+    }),
+  },
+  {
+    key: 'skills',
+    title: '技能描述重组',
+    desc: '按熟练度排序、补充分类与年限',
+    buttonText: '优化技能描述',
+    loading: optStatus.skills === 'loading',
+    statusText: optStatus.skills === 'done' ? '已优化' : (optStatus.skills === 'loading' ? '处理中' : '待优化'),
+    statusClass: optStatus.skills === 'done' ? 'st-done' : 'st-idle',
+    run: () => optimizeItem('skills', () => {
+      // 简单示例：在技能后追加「(熟练)」标记
+      resumeContent.skills.forEach((s) => {
+        if (!/[（(]\w+[)）]/.test(s.name)) s.name = `${s.name}（${s.proficiency || '熟练掌握'}）`
+      })
+    }),
+  },
+  {
+    key: 'summary',
+    title: '生成个人简介',
+    desc: '基于经历自动生成一句话自我介绍',
+    buttonText: 'AI 生成简介',
+    loading: optStatus.summary === 'loading',
+    statusText: optStatus.summary === 'done' ? '已生成' : (optStatus.summary === 'loading' ? '处理中' : '待生成'),
+    statusClass: optStatus.summary === 'done' ? 'st-done' : 'st-idle',
+    run: () => optimizeItem('summary', () => {
+      userProfileStore.updateBasic({
+        self_introduction: `${resumeContent.intention.position || '后端工程师'}，${resumeContent.work.length} 年工作经验，专注于${resumeContent.skills.slice(0, 2).map((s) => s.category).join('、')}方向，擅长高并发系统设计与性能优化。`,
+      })
+    }),
+  },
 ])
-const suggestions = computed(() => {
-  const items = []
-  const allDescriptions = [...resumeContent.work, ...resumeContent.project].map((item) => item.description).join(' ')
-  if (!/[0-9]+[%万倍ms]/.test(allDescriptions)) items.push({ title: '补充量化成果', detail: '在项目与工作经历中加入性能、规模、效率或业务结果指标。' })
-  if (resumeContent.project.length < 2) items.push({ title: '项目证据偏少', detail: '建议补充一个能体现架构设计或复杂问题解决能力的项目。' })
-  if (!/Kafka|RocketMQ|消息队列/i.test(allDescriptions + resumeContent.skills.map((item) => item.name).join(' '))) items.push({ title: '关键词覆盖不足', detail: '目标 JD 强调消息队列，可在真实使用过的经历中补充对应技术。' })
-  items.push({ title: '强化岗位定位', detail: `将最相关的${resumeContent.intention.position || '目标岗位'}经历放在前半页，降低招聘者理解成本。` })
-  return items.slice(0, 3)
-})
+
+const optimizeAll = async () => {
+  optimizeLoading.value = true
+  for (const item of optimizeItems.value) {
+    await item.run()
+  }
+  optimizeLoading.value = false
+  message.success('AI 全部优化完成')
+}
 
 watch(() => resumeStore.currentVersion, (version) => {
   if (!version || demoMode.value) return
@@ -503,7 +973,6 @@ const handleSaveVersion = async () => {
   savingVersion.value = false
   if (version) { showSaveVersionModal.value = false; newVersionNote.value = '' }
 }
-const handleOptimize = () => message.success(demoMode.value ? '已完成本地诊断演示；接入后端后可生成真实优化版本' : '请使用现有 AI 操作生成优化版本')
 const previewNavigate = (target: 'interview' | 'delivery') => {
   message.info(target === 'interview' ? '面试训练场将在下一阶段完善' : '投递看板将在下一阶段完善')
 }
@@ -511,7 +980,22 @@ const exportResume = () => window.print()
 const backToList = () => demoMode.value ? router.push('/') : router.push('/app/resumes')
 const formatVersionDate = (value: string) => value ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 
+// 从个人资料 store 同步基础信息到简历 personal 字段
+// 只在用户已填写个人资料时同步，且会覆盖示例默认值
+const syncFromUserProfile = () => {
+  if (!userProfileStore.hasFilled) return
+  const b = userProfileStore.basic
+  if (b.name) resumeContent.personal.name = b.name
+  if (b.phone) resumeContent.personal.phone = b.phone
+  if (b.email) resumeContent.personal.email = b.email
+  if (b.city) resumeContent.personal.city = b.city
+  if (b.github) resumeContent.personal.github = b.github
+}
+
 onMounted(async () => {
+  document.documentElement.classList.add('resume-editor-scroll-lock')
+  document.body.classList.add('resume-editor-scroll-lock')
+
   if (demoMode.value) return
   if (!resumeId.value || Number.isNaN(resumeId.value)) return router.push('/app/resumes')
   await resumeStore.fetchOne(resumeId.value)
@@ -519,71 +1003,101 @@ onMounted(async () => {
   targetJd.value = resumeStore.currentResume?.target_jd || targetJd.value
   await resumeStore.fetchVersions(resumeId.value)
   if (resumeStore.versions.length) resumeStore.setCurrentVersion(resumeStore.versions[0])
+  // 加载完简历版本后，同步个人资料
+  syncFromUserProfile()
 })
+
+onBeforeUnmount(() => {
+  document.documentElement.classList.remove('resume-editor-scroll-lock')
+  document.body.classList.remove('resume-editor-scroll-lock')
+})
+
+// 监听个人资料变化，实时同步到简历（用户在弹窗保存后立即生效）
+watch(
+  () => userProfileStore.basic,
+  () => syncFromUserProfile(),
+  { deep: true }
+)
 </script>
 
 <style scoped>
-.resume-shell { --ink: #17211d; --muted: #68736d; --line: #dfe4e0; --green: #087443; --green-soft: #e8f3ed; width: 100%; height: 100%; min-height: 0; display: flex; overflow: hidden; background: #eef0ed; color: var(--ink); }
+:global(html.resume-editor-scroll-lock),
+:global(body.resume-editor-scroll-lock) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ===== 局部变量映射到 Pinguo 全局 token（保持编辑器结构与全局视觉一致） ===== */
+.resume-shell {
+  --ink: var(--foreground);
+  --muted: var(--muted-foreground);
+  --line: var(--border);
+  --green: var(--primary);
+  --green-soft: var(--brand-50);
+  width: 100%; height: 100%; min-height: 0; display: flex; overflow: hidden; background: var(--background-100); color: var(--ink);
+  font-family: var(--font-sans);
+}
 .resume-shell.has-preview-sidebar { height: 100dvh; }
-.product-sidebar { flex: 0 0 216px; min-width: 216px; display: flex; flex-direction: column; padding: 18px 12px 14px; border-right: 1px solid #dce2de; background: #f8faf8; position: relative; z-index: 8; }
+.product-sidebar { flex: 0 0 216px; min-width: 216px; display: flex; flex-direction: column; padding: 18px 12px 14px; border-right: 1px solid var(--sidebar-border); background: var(--sidebar); position: relative; z-index: 8; }
 .sidebar-brand { width: 100%; display: flex; align-items: center; gap: 11px; padding: 4px 7px 20px; border: 0; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
-.sidebar-logo { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; background: var(--green); color: #fff; font-size: 17px; font-weight: 850; }
+.sidebar-logo { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 10px; background: var(--primary); color: var(--primary-foreground); font-size: 17px; font-weight: 850; }
 .sidebar-brand > span:last-child, .product-nav button > span { min-width: 0; display: flex; flex-direction: column; }
 .sidebar-brand strong { font-size: 16px; line-height: 1.2; }
-.sidebar-brand small { margin-top: 3px; color: #7a847f; font-size: 10px; }
+.sidebar-brand small { margin-top: 3px; color: var(--muted-foreground); font-size: 10px; }
 .product-nav { display: flex; flex-direction: column; gap: 6px; }
-.product-nav button { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 11px; padding: 10px 11px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #505c56; text-align: left; cursor: pointer; transition: background .18s, border-color .18s, color .18s; }
-.product-nav button:hover { background: #eef3f0; color: var(--ink); }
-.product-nav button.active { border-color: #bfdbcc; background: var(--green-soft); color: var(--green); }
+.product-nav button { width: 100%; min-height: 60px; display: flex; align-items: center; gap: 11px; padding: 10px 11px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--secondary-foreground); text-align: left; cursor: pointer; transition: background .18s, border-color .18s, color .18s; }
+.product-nav button:hover { background: var(--sidebar-accent); color: var(--ink); }
+.product-nav button.active { border-color: transparent; background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
 .product-nav button > :deep(.anticon) { flex: 0 0 18px; font-size: 17px; }
 .product-nav strong { font-size: 13px; line-height: 1.25; }
-.product-nav small { margin-top: 4px; overflow: hidden; color: #87918c; font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
-.product-nav button.active small { color: #56806a; }
-.sidebar-foot { margin-top: auto; display: flex; align-items: center; gap: 7px; padding: 10px; color: #7b8680; font-size: 10px; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #2f9e66; box-shadow: 0 0 0 3px #dff1e7; }
-.resume-lab { height: 100%; min-height: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; background: #eef0ed; color: var(--ink); }
-.lab-toolbar { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 24px; background: #fff; border-bottom: 1px solid var(--line); position: relative; z-index: 5; }
+.product-nav small { margin-top: 4px; overflow: hidden; color: var(--muted-foreground); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.product-nav button.active small { color: var(--primary); }
+.sidebar-foot { margin-top: auto; display: flex; align-items: center; gap: 7px; padding: 10px; color: var(--muted-foreground); font-size: 10px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px var(--state-success-surface); }
+.resume-lab { height: 100%; min-height: 0; flex: 1 1 auto; min-width: 0; overflow: hidden; background: var(--background-100); color: var(--ink); }
+.lab-toolbar { height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 24px; background: var(--card); border-bottom: 1px solid var(--line); position: relative; z-index: 5; }
 .toolbar-leading, .toolbar-controls { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .toolbar-controls { overflow-x: auto; scrollbar-width: none; }
-.icon-button { width: 36px; height: 36px; border: 0; background: transparent; border-radius: 7px; cursor: pointer; font-size: 16px; }
-.icon-button:hover { background: #f1f3f1; }
-.brand-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--green); font-weight: 800; }
+.icon-button { width: 36px; height: 36px; border: 0; background: transparent; border-radius: 9px; cursor: pointer; font-size: 16px; color: var(--muted-foreground); transition: background .18s, color .18s; }
+.icon-button:hover { background: var(--background-200); color: var(--ink); }
+.brand-mark { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--primary-foreground); background: var(--primary); font-weight: 800; }
 .resume-title-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .resume-name { width: 190px; border: 0; border-bottom: 1px solid transparent; outline: 0; color: var(--ink); font-size: 16px; font-weight: 750; background: transparent; }
-.resume-name:focus { border-color: var(--green); }
+.resume-name:focus { border-color: var(--primary); }
 .save-state { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.save-state :deep(.anticon) { color: var(--green); margin-right: 4px; }
-.toolbar-select { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 9px; border-left: 1px solid var(--line); color: #33403a; }
-.toolbar-select select { border: 0; outline: 0; background: transparent; font-size: 13px; cursor: pointer; }
+.save-state :deep(.anticon) { color: var(--primary); margin-right: 4px; }
+.toolbar-select { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 9px; border-left: 1px solid var(--line); color: var(--secondary-foreground); }
+.toolbar-select select { border: 0; outline: 0; background: transparent; font-size: 13px; cursor: pointer; color: var(--ink); }
 .toolbar-select.compact { padding-right: 4px; }
-.zoom-control { height: 34px; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fafbfa; }
-.zoom-control button { width: 30px; height: 100%; border: 0; background: transparent; cursor: pointer; }
-.zoom-control span { width: 52px; text-align: center; font-size: 12px; }
-.export-button { background: var(--green); box-shadow: none; }
-.lab-workspace { height: calc(100% - 64px); min-height: 0; display: grid; grid-template-columns: clamp(290px, 23vw, 340px) minmax(0, 1fr) clamp(280px, 21vw, 320px); }
-.editor-panel, .ai-panel { background: #fff; min-width: 0; overflow: hidden; }
-.editor-panel { border-right: 1px solid var(--line); }
-.ai-panel { border-left: 1px solid var(--line); padding: 20px; overflow-y: auto; }
+.zoom-control { height: 34px; display: flex; align-items: center; border: 1px solid var(--line); border-radius: 9999px; overflow: hidden; background: var(--background-100); }
+.zoom-control button { width: 30px; height: 100%; border: 0; background: transparent; cursor: pointer; color: var(--ink); }
+.zoom-control span { width: 52px; text-align: center; font-size: 12px; color: var(--ink); }
+.export-button { background: var(--primary) !important; border-color: var(--primary) !important; box-shadow: none; border-radius: 9999px !important; }
+.export-button:hover { background: var(--brand-600) !important; border-color: var(--brand-600) !important; }
+.lab-workspace { height: calc(100% - 64px); min-height: 0; display: grid; grid-template-columns: clamp(320px, 26vw, 400px) minmax(0, 1fr); gap: 20px; padding: 20px 24px 24px; background: var(--background-100); box-sizing: border-box; overflow: hidden; }
+.editor-panel { background: var(--card); min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-sm); }
+.smart-pane-wrap { display: flex; flex-direction: column; padding: 14px; overflow-y: auto; }
 .panel-tabs { height: 51px; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
-.panel-tabs button { border: 0; background: #fff; color: var(--muted); font-weight: 650; cursor: pointer; position: relative; }
-.panel-tabs button.active { color: var(--green); }
-.panel-tabs button.active::after { content: ''; height: 2px; background: var(--green); position: absolute; left: 22px; right: 22px; bottom: 0; }
-.panel-hint { padding: 12px 16px; color: var(--muted); font-size: 12px; background: #fafbfa; border-bottom: 1px solid #edf0ed; }
-.editor-scroll, .raw-json-panel { height: calc(100% - 51px); overflow-y: auto; }
-.raw-json-panel pre { margin: 0; padding: 18px; color: #34423b; font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.panel-tabs button { border: 0; background: var(--card); color: var(--muted); font-weight: 650; cursor: pointer; position: relative; transition: color .18s; }
+.panel-tabs button:hover { color: var(--ink); }
+.panel-tabs button.active { color: var(--primary); }
+.panel-tabs button.active::after { content: ''; height: 2px; background: var(--primary); position: absolute; left: 22px; right: 22px; bottom: 0; border-radius: 2px; }
+.panel-hint { padding: 12px 16px; color: var(--muted); font-size: 12px; background: var(--background-100); border-bottom: 1px solid var(--line); }
+.editor-scroll { height: calc(100% - 51px); overflow-y: auto; }
 .form-section { border-bottom: 1px solid var(--line); }
-.section-heading { width: 100%; height: 48px; padding: 0 9px 0 16px; display: flex; align-items: center; justify-content: space-between; background: #fff; color: var(--ink); transition: opacity .18s, background .18s; }
-.section-heading.disabled { opacity: .55; background: #fafbfa; }
+.section-heading { width: 100%; height: 48px; padding: 0 9px 0 16px; display: flex; align-items: center; justify-content: space-between; background: var(--card); color: var(--ink); transition: opacity .18s, background .18s; }
+.section-heading.disabled { opacity: .55; background: var(--background-100); }
 .visibility-toggle { min-width: 0; flex: 1; height: 100%; display: flex; align-items: center; gap: 9px; cursor: pointer; font-weight: 720; }
 .visibility-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.custom-check { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border: 1.5px solid #aeb8b2; border-radius: 5px; background: #fff; color: transparent; transition: background .18s, border-color .18s, box-shadow .18s; }
+.custom-check { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border: 1.5px solid var(--background-400); border-radius: 5px; background: var(--card); color: transparent; transition: background .18s, border-color .18s, box-shadow .18s; }
 .custom-check :deep(.anticon) { font-size: 11px; }
-.visibility-toggle input:checked + .custom-check { border-color: var(--green); background: var(--green); color: #fff; }
-.visibility-toggle input:focus-visible + .custom-check { box-shadow: 0 0 0 3px rgba(8,116,67,.15); }
-.visibility-toggle > :deep(.anticon) { color: #526159; }
+.visibility-toggle input:checked + .custom-check { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.visibility-toggle input:focus-visible + .custom-check { box-shadow: 0 0 0 3px rgba(0,122,255,.15); }
+.visibility-toggle > :deep(.anticon) { color: var(--secondary-foreground); }
 .visibility-toggle strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.collapse-button { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #89918d; cursor: pointer; }
-.collapse-button:hover { background: #f0f3f1; color: var(--ink); }
+.collapse-button { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--muted-foreground); cursor: pointer; transition: background .18s, color .18s; }
+.collapse-button:hover { background: var(--background-200); color: var(--ink); }
 .collapse-button :deep(.anticon) { transition: transform .2s; }
 .form-section.collapsed .collapse-button :deep(.anticon) { transform: rotate(-90deg); }
 .form-section.collapsed .section-body { display: none; }
@@ -592,20 +1106,23 @@ onMounted(async () => {
 .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .field.full { grid-column: 1 / -1; }
 .field span { color: var(--muted); font-size: 11px; font-weight: 650; }
-.field input, .field textarea, .skill-row input, .jd-field textarea { width: 100%; border: 1px solid #d9dedb; border-radius: 6px; outline: none; padding: 8px 9px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; transition: border-color .2s, box-shadow .2s; }
+.field input, .field textarea, .skill-row input { width: 100%; border: 1px solid var(--line); border-radius: 8px; outline: none; padding: 8px 9px; color: var(--ink); background: var(--card); font: inherit; font-size: 12px; transition: border-color .2s, box-shadow .2s; }
 .field textarea { resize: vertical; line-height: 1.55; }
-.field input:focus, .field textarea:focus, .skill-row input:focus, .jd-field textarea:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(8,116,67,.08); }
+.field input:focus, .field textarea:focus, .skill-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,122,255,.12); }
+.field input::placeholder, .field textarea::placeholder { color: var(--muted-foreground); }
 .repeat-list { display: flex; flex-direction: column; gap: 10px; }
-.repeat-item { position: relative; padding: 12px; border: 1px solid #e1e5e2; border-radius: 7px; background: #fbfcfb; }
-.remove-item { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #929a96; cursor: pointer; z-index: 2; }
-.remove-item:hover { color: #b42318; background: #fff0ee; }
-.add-item { min-height: 34px; border: 1px dashed #bdc8c1; border-radius: 6px; background: #fff; color: var(--green); cursor: pointer; font-weight: 650; }
+.repeat-item { position: relative; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--background-100); }
+.remove-item { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); cursor: pointer; z-index: 2; transition: background .15s, color .15s; }
+.remove-item:hover { color: var(--destructive); background: var(--state-error-surface); }
+.add-item { min-height: 34px; border: 1px dashed var(--background-400); border-radius: 9999px; background: var(--card); color: var(--primary); cursor: pointer; font-weight: 650; transition: background .15s, border-color .15s; }
+.add-item:hover { background: var(--brand-50); border-color: var(--primary); }
 .skill-row { display: grid; grid-template-columns: 90px 1fr 26px; gap: 6px; }
-.skill-row button { border: 0; background: transparent; color: #999; cursor: pointer; }
-.preview-stage { min-width: 0; overflow: hidden; background: #e9ebe8; display: flex; flex-direction: column; }
-.stage-meta { height: 42px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; color: #69736e; font-size: 11px; border-bottom: 1px solid #d8dcd9; }
-.paper-viewport { flex: 1; overflow: auto; padding: 26px 32px 80px; display: flex; justify-content: center; align-items: flex-start; }
-.resume-paper { width: 794px; min-height: 1123px; transform-origin: top center; padding: 56px 60px; background: #fff; box-shadow: 0 8px 28px rgba(31,40,35,.13); color: #161d19; transition: transform .18s ease; }
+.skill-row button { border: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.skill-row button:hover { color: var(--destructive); }
+.preview-stage { min-width: 0; overflow: hidden; background: var(--card); display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-sm); }
+.stage-meta { height: 42px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; color: var(--muted-foreground); font-size: 11px; border-bottom: 1px solid var(--line); }
+.paper-viewport { flex: 1; overflow: auto; padding: 26px 32px 80px; display: flex; justify-content: center; align-items: flex-start; background: var(--background-100); }
+.resume-paper { width: 794px; min-height: 1123px; transform-origin: top center; padding: 56px 60px; background: var(--card); box-shadow: var(--shadow-lg); color: var(--text-800); transition: transform .18s ease; border-radius: 4px; }
 .resume-paper.font-serif { font-family: 'Songti SC', 'Noto Serif SC', serif; }
 .resume-paper.font-sans { font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; }
 .paper-header { padding-bottom: 16px; border-bottom: 2px solid #26312b; }
@@ -701,38 +1218,126 @@ onMounted(async () => {
 .ai-heading h2 { margin: 3px 0 0; font-size: 15px; }
 .ai-heading > :deep(.anticon) { color: var(--green); font-size: 20px; }
 .ai-kicker { color: var(--green); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
-.match-card, .dimension-card, .suggestion-card { padding: 15px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
-.match-card > span { color: var(--muted); font-size: 12px; }
-.score-line { display: flex; align-items: center; gap: 10px; margin: 5px 0 9px; }
-.score-line strong { color: var(--green); font-size: 36px; line-height: 1; }
-.score-line em { padding: 3px 8px; border-radius: 4px; background: var(--green-soft); color: var(--green); font-style: normal; font-size: 11px; }
-.score-track { height: 6px; border-radius: 10px; background: #e7eae8; overflow: hidden; }
-.score-track i, .dimension-row div i { display: block; height: 100%; background: var(--green); border-radius: inherit; }
-.match-card small { display: block; margin-top: 9px; color: #8a938e; font-size: 10px; }
-.dimension-card h3, .suggestion-card h3 { margin: 0 0 12px; font-size: 13px; }
-.dimension-row { display: grid; grid-template-columns: 62px 1fr 26px; align-items: center; gap: 8px; margin: 8px 0; color: #5c6660; font-size: 10px; }
-.dimension-row div { height: 4px; border-radius: 8px; background: #edf0ee; overflow: hidden; }
-.dimension-row b { color: #65706a; text-align: right; }
-.suggestion-card h3 span { color: var(--green); }
-.suggestion-card article { display: flex; gap: 9px; padding: 10px 0; border-top: 1px solid #edf0ed; }
-.suggestion-card article > b { flex: 0 0 22px; height: 22px; display: grid; place-items: center; border-radius: 5px; color: var(--green); background: var(--green-soft); font-size: 11px; }
-.suggestion-card strong { font-size: 11.5px; }
-.suggestion-card p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
-.jd-field { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
-.jd-field span { font-size: 12px; font-weight: 700; }
-.jd-field textarea { resize: vertical; font-size: 11px; line-height: 1.5; }
-.optimize-button { width: 100%; min-height: 42px; margin-top: 10px; border: 0; border-radius: 7px; background: var(--green); color: #fff; cursor: pointer; font-weight: 750; }
-.privacy-note { margin: 10px 0 0; color: #89918d; font-size: 9.5px; text-align: center; }
+
+/* === 智能完善 tabs === */
+.smart-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 5px; background: var(--background-200); border-radius: 12px; margin-bottom: 16px; }
+.smart-tab-btn { width: 100%; height: 42px; min-width: 0; display: grid; grid-template-columns: 18px auto; align-items: center; justify-content: center; column-gap: 6px; padding: 0 8px; border: 0; background: transparent; color: var(--muted); font-size: 11px; line-height: 18px; font-weight: 650; cursor: pointer; border-radius: 9px; transition: background .15s, color .15s, box-shadow .15s; }
+.smart-tab-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.55); color: var(--secondary-foreground); }
+.smart-tab-btn.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow-sm); }
+.smart-tab-btn :deep(.anticon) { width: 18px; height: 18px; display: grid; place-items: center; font-size: 15px; line-height: 1; }
+.smart-tab-btn > span:last-child { min-width: 0; line-height: 18px; white-space: nowrap; }
+
+.smart-pane { display: flex; flex-direction: column; gap: 14px; }
+.pane-head { min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.pane-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.mini-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 9999px; background: var(--card); color: var(--muted); font-size: 11px; cursor: pointer; transition: all .15s; }
+.mini-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.mini-btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.mini-btn.primary:hover:not(:disabled) { background: var(--brand-600); border-color: var(--brand-600); }
+.mini-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* === 分析页 === */
+.score-overview { display: flex; align-items: center; gap: 14px; padding: 14px; background: linear-gradient(135deg, var(--brand-50) 0%, var(--card) 100%); border: 1px solid var(--line); border-radius: 12px; }
+.score-ring { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.score-ring svg { width: 100%; height: 100%; }
+.score-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 22px; font-weight: 800; }
+.score-num small { font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+.score-meta { flex: 1; min-width: 0; }
+.score-meta strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 4px; }
+.score-meta p { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+.dim-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.dim-card h4 { margin: 0 0 10px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.dim-card h4 small { font-weight: 500; color: var(--muted); margin-left: 6px; }
+.dim-row { display: grid; grid-template-columns: 80px 1fr 28px; align-items: center; gap: 8px; margin: 7px 0; font-size: 11px; }
+.dim-label { color: var(--muted); }
+.dim-track { height: 5px; border-radius: 9999px; background: var(--background-200); overflow: hidden; }
+.dim-track i { display: block; height: 100%; border-radius: inherit; transition: width .4s ease; }
+.dim-row b { font-size: 11px; text-align: right; }
+
+.hl-list { display: flex; flex-direction: column; gap: 8px; }
+.hl-item { display: flex; gap: 8px; padding: 9px 0; border-top: 1px solid var(--background-200); }
+.hl-item:first-child { border-top: 0; padding-top: 0; }
+.hl-item :deep(.anticon) { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+.hl-good :deep(.anticon) { color: var(--success); }
+.hl-bad :deep(.anticon) { color: var(--warning); }
+.hl-item strong { font-size: 12px; color: var(--ink); display: block; margin-bottom: 3px; }
+.hl-item p { margin: 0; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+.link-btn { display: inline-flex; align-items: center; gap: 3px; margin-top: 6px; padding: 4px 9px; border: 0; background: var(--brand-50); color: var(--primary); font-size: 10px; font-weight: 700; border-radius: 9999px; cursor: pointer; transition: background .15s, color .15s; }
+.link-btn:hover { background: var(--primary); color: var(--primary-foreground); }
+.link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* === JD 匹配页 === */
+.jd-textarea-wrap { position: relative; display: block; }
+.jd-textarea-wrap textarea { width: 100%; resize: vertical; font-size: 11.5px; line-height: 1.55; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; outline: none; font: inherit; color: var(--ink); background: var(--card); min-height: 110px; transition: border-color .2s, box-shadow .2s; }
+.jd-textarea-wrap textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,122,255,.12); }
+.jd-textarea-wrap textarea::placeholder { color: var(--muted-foreground); }
+.jd-counter { position: absolute; right: 9px; bottom: 7px; font-size: 10px; color: var(--muted); background: var(--card); padding: 1px 5px; border-radius: 4px; }
+
+.jd-result { display: flex; flex-direction: column; gap: 14px; padding: 14px; background: var(--background-100); border: 1px solid var(--line); border-radius: 12px; }
+.jd-match-ring { position: relative; width: 120px; height: 120px; margin: 0 auto; }
+.jd-match-ring svg { width: 100%; height: 100%; }
+.jd-match-num { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.jd-match-num strong { font-size: 24px; font-weight: 800; color: var(--ink); }
+.jd-match-num small { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.jd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.jd-stat-item { display: flex; flex-direction: column; align-items: center; padding: 8px; background: var(--card); border-radius: 10px; }
+.jd-stat-num { font-size: 18px; font-weight: 800; }
+.jd-stat-num.green { color: var(--success); }
+.jd-stat-num.red { color: var(--destructive); }
+.jd-stat-num.blue { color: var(--primary); }
+.jd-stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+.kw-section h5 { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: var(--ink); }
+.kw-section h5 small { font-weight: 500; color: var(--muted); margin-left: 4px; }
+.kw-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.kw-tag { padding: 3px 9px; border-radius: 9999px; font-size: 10.5px; font-weight: 600; }
+.kw-green { background: rgba(52,199,89,0.12); color: var(--success); }
+.kw-red { background: var(--state-error-surface); color: var(--destructive); }
+.kw-empty { color: var(--muted); font-size: 11px; }
+
+.suggest-item { display: flex; gap: 8px; padding: 9px 0; border-top: 1px solid var(--background-200); }
+.suggest-item:first-child { border-top: 0; }
+.suggest-item b { flex: 0 0 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--brand-50); color: var(--primary); font-size: 10px; }
+.suggest-item strong { font-size: 11.5px; color: var(--ink); display: block; }
+.suggest-item p { margin: 3px 0 0; font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+.jd-empty { min-height: 82px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 18px 20px; border: 1px dashed var(--border); border-radius: 12px; background: var(--background-100); color: var(--muted); }
+.jd-empty :deep(.anticon) { flex: 0 0 auto; font-size: 24px; opacity: 0.55; }
+.jd-empty p { margin: 0; font-size: 11px; line-height: 1.5; }
+
+/* === AI 优化页 === */
+.opt-section { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 10px; }
+.opt-section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; }
+.opt-desc { margin: 0 0 10px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+.opt-actions { display: flex; gap: 8px; }
+.opt-btn { flex: 1; padding: 9px 12px; border: 0; border-radius: 9999px; background: var(--primary); color: var(--primary-foreground); font-size: 12px; font-weight: 700; cursor: pointer; transition: background .15s; }
+.opt-btn:hover:not(:disabled) { background: var(--brand-600); }
+.opt-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.opt-item { padding: 10px 0; border-top: 1px solid var(--background-200); }
+.opt-item:first-of-type { border-top: 0; padding-top: 0; }
+.opt-item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.opt-item-head strong { font-size: 12px; color: var(--ink); }
+.opt-item-status { padding: 2px 7px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
+.st-idle { background: var(--background-200); color: var(--muted); }
+.st-done { background: var(--state-success-surface); color: var(--success); }
+.opt-item-desc { margin: 0 0 6px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+
+.privacy-note { position: sticky; bottom: -14px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 5px; margin: auto -14px -14px; padding: 12px 14px 14px; border-top: 1px solid var(--background-200); background: var(--card); color: var(--muted-foreground); font-size: 9.5px; line-height: 1.45; text-align: center; }
 .version-list { display: flex; flex-direction: column; gap: 8px; }
-.version-list button { display: flex; flex-direction: column; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #fff; text-align: left; cursor: pointer; }
-.version-list button.active { border-color: var(--green); background: var(--green-soft); }
+.version-list button { display: flex; flex-direction: column; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+.version-list button:hover { background: var(--background-100); }
+.version-list button.active { border-color: var(--primary); background: var(--brand-50); }
 .version-list button span { display: flex; justify-content: space-between; }
 .version-list small, .version-list em { color: var(--muted); font-size: 11px; font-style: normal; }
-@media (max-width: 1380px) { .lab-workspace { grid-template-columns: clamp(286px, 27vw, 320px) minmax(0, 1fr); } .ai-panel { display: none; } .toolbar-select { display: none; } .save-state { display: none; } }
+@media (max-width: 1380px) { .lab-workspace { grid-template-columns: clamp(300px, 30vw, 360px) minmax(0, 1fr); } .toolbar-select { display: none; } .save-state { display: none; } }
 @media (max-width: 1060px) { .product-sidebar { flex-basis: 176px; min-width: 176px; padding-inline: 9px; } .product-nav small, .sidebar-foot { display: none; } .product-nav button { min-height: 50px; } .lab-toolbar { padding-inline: 14px; gap: 10px; } .resume-name { width: 150px; } }
 @media (max-width: 820px) {
-  .resume-shell, .resume-shell.has-preview-sidebar { height: 100dvh; min-height: 0; flex-direction: column; overflow: hidden; }
-  .product-sidebar { width: 100%; min-width: 0; flex: 0 0 58px; min-height: 58px; flex-direction: row; align-items: center; padding: 7px 10px; border-right: 0; border-bottom: 1px solid #dce2de; }
+  .resume-shell { height: 100%; min-height: 0; flex-direction: column; overflow: hidden; }
+  .resume-shell.has-preview-sidebar { height: 100dvh; }
+  .product-sidebar { width: 100%; min-width: 0; flex: 0 0 58px; min-height: 58px; flex-direction: row; align-items: center; padding: 7px 10px; border-right: 0; border-bottom: 1px solid var(--sidebar-border); }
   .sidebar-brand { width: auto; padding: 0 8px 0 0; }
   .sidebar-logo { width: 34px; height: 34px; flex-basis: 34px; }
   .product-nav { flex: 1; min-width: 0; flex-direction: row; justify-content: flex-end; gap: 3px; }
@@ -746,7 +1351,7 @@ onMounted(async () => {
   .toolbar-leading { width: 100%; }
   .toolbar-controls { width: 100%; overflow-x: auto; padding-bottom: 2px; }
   .resume-name { width: min(46vw, 190px); }
-  .lab-workspace { height: calc(100% - 108px); display: grid; grid-template-columns: minmax(270px, 38vw) minmax(0, 1fr); }
+  .lab-workspace { height: calc(100% - 108px); display: grid; grid-template-columns: minmax(270px, 38vw) minmax(0, 1fr); gap: 12px; padding: 12px 14px 14px; }
   .editor-panel { height: auto; border-right: 1px solid var(--line); border-bottom: 0; }
   .preview-stage { height: auto; min-height: 0; }
   .paper-viewport { padding: 18px 18px 60px; justify-content: flex-start; }
@@ -755,10 +1360,10 @@ onMounted(async () => {
 @media (max-width: 620px) {
   .product-nav button { padding-inline: 5px; }
   .product-nav button > :deep(.anticon) { display: none; }
-  .lab-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(270px, 46%) minmax(0, 54%); }
+  .lab-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(270px, 46%) minmax(0, 54%); gap: 10px; padding: 10px 12px 12px; }
   .editor-panel { border-right: 0; border-bottom: 1px solid var(--line); }
   .stage-meta span:last-child { display: none; }
 }
-@media (max-height: 680px) and (min-width: 821px) { .lab-toolbar { height: 54px; padding-inline: 14px; } .lab-workspace { height: calc(100% - 54px); } .panel-tabs { height: 44px; } .editor-scroll, .raw-json-panel { height: calc(100% - 44px); } }
-@media print { .product-sidebar, .lab-toolbar, .editor-panel, .ai-panel, .stage-meta { display: none !important; } .resume-shell, .resume-lab, .lab-workspace, .preview-stage, .paper-viewport { display: block; height: auto; overflow: visible; background: #fff; padding: 0; } .resume-paper { transform: none !important; box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; } }
+@media (max-height: 680px) and (min-width: 821px) { .lab-toolbar { height: 54px; padding-inline: 14px; } .lab-workspace { height: calc(100% - 54px); } .panel-tabs { height: 44px; } .editor-scroll { height: calc(100% - 44px); } }
+@media print { .product-sidebar, .lab-toolbar, .editor-panel, .stage-meta { display: none !important; } .resume-shell, .resume-lab, .lab-workspace, .preview-stage, .paper-viewport { display: block; height: auto; overflow: visible; background: #fff; padding: 0; } .resume-paper { transform: none !important; box-shadow: none; margin: 0; width: 210mm; min-height: 297mm; } }
 </style>
