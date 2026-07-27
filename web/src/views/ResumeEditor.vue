@@ -1325,7 +1325,7 @@ watch(
 .st-done { background: var(--state-success-surface); color: var(--success); }
 .opt-item-desc { margin: 0 0 6px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
 
-.privacy-note { position: sticky; bottom: -14px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 5px; margin: auto -14px -14px; padding: 12px 14px 14px; border-top: 1px solid var(--background-200); background: var(--card); color: var(--muted-foreground); font-size: 9.5px; line-height: 1.45; text-align: center; }
+.privacy-note { position: sticky; bottom: -14px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 5px; margin: auto -14px -14px; padding: 12px 14px 14px; border-top: 10px solid transparent; background: var(--card); background-clip: padding-box; box-shadow: inset 0 1px 0 var(--background-200); color: var(--muted-foreground); font-size: 9.5px; line-height: 1.45; text-align: center; }
 .version-list { display: flex; flex-direction: column; gap: 8px; }
 .version-list button { display: flex; flex-direction: column; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
 .version-list button:hover { background: var(--background-100); }
