@@ -1,12 +1,17 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/glebarez/sqlite"
+	"github.com/zhitu/server/internal/config"
 	"github.com/zhitu/server/internal/models"
 	"gorm.io/gorm"
 )
@@ -132,5 +137,92 @@ func TestSummarizeResumeTruncatesPromptContent(t *testing.T) {
 	}
 	if got := len([]rune(summary)); got > maxResumePromptRunes+20 {
 		t.Fatalf("summary rune count = %d", got)
+	}
+}
+
+func TestTranscribeVoiceDoesNotAdvanceInterview(t *testing.T) {
+	requests := make(chan map[string]interface{}, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		requests <- payload
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"这是转写后的回答"}}]}`))
+	}))
+	defer upstream.Close()
+
+	db, err := gorm.Open(sqlite.Open("file:transcribe_voice_test?mode=memory&cache=shared"), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
+	if err != nil {
+		t.Fatalf("open test database: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Interview{}, &models.InterviewMessage{}); err != nil {
+		t.Fatalf("migrate test database: %v", err)
+	}
+
+	interview := models.Interview{
+		UserID:            1,
+		Status:            StatusOngoing,
+		CurrentQuestionNo: 2,
+		TotalQuestions:    5,
+	}
+	if err := db.Create(&interview).Error; err != nil {
+		t.Fatalf("create interview: %v", err)
+	}
+
+	llm := NewLLMService(&config.LLMConfig{
+		Provider:     "mimo",
+		BaseURL:      upstream.URL,
+		APIKey:       "test-key",
+		WhisperModel: "mimo-v2.5-asr",
+	})
+	service := NewInterviewService(db, llm, nil, nil)
+	text, err := service.TranscribeVoice(
+		context.Background(),
+		1,
+		interview.ID,
+		bytes.NewReader([]byte("RIFF-test-wav")),
+		"answer.wav",
+	)
+	if err != nil {
+		t.Fatalf("TranscribeVoice() error = %v", err)
+	}
+	if text != "这是转写后的回答" {
+		t.Fatalf("TranscribeVoice() = %q", text)
+	}
+
+	payload := <-requests
+	if payload["model"] != "mimo-v2.5-asr" {
+		t.Fatalf("model = %#v", payload["model"])
+	}
+	messages, ok := payload["messages"].([]interface{})
+	if !ok || len(messages) != 1 {
+		t.Fatalf("messages = %#v", payload["messages"])
+	}
+	messagePayload := messages[0].(map[string]interface{})
+	content := messagePayload["content"].([]interface{})
+	audioItem := content[0].(map[string]interface{})
+	inputAudio := audioItem["input_audio"].(map[string]interface{})
+	if data, _ := inputAudio["data"].(string); !strings.HasPrefix(data, "data:audio/wav;base64,") {
+		t.Fatalf("audio data url = %q", data)
+	}
+
+	var count int64
+	if err := db.Model(&models.InterviewMessage{}).Where("interview_id = ?", interview.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count messages: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("message count = %d, want 0", count)
+	}
+	var persisted models.Interview
+	if err := db.First(&persisted, interview.ID).Error; err != nil {
+		t.Fatalf("reload interview: %v", err)
+	}
+	if persisted.CurrentQuestionNo != 2 {
+		t.Fatalf("current question = %d, want 2", persisted.CurrentQuestionNo)
 	}
 }

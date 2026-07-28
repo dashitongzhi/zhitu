@@ -142,6 +142,7 @@ func New(deps Deps) *gin.Engine {
 			interviews.GET("/:id", deps.InterviewHandler.Get)
 			interviews.POST("/:id/resume", deps.InterviewHandler.AttachResume)
 			interviews.POST("/:id/messages", deps.InterviewHandler.SendMessage)
+			interviews.POST("/:id/transcribe", deps.InterviewHandler.TranscribeVoice)
 			interviews.POST("/:id/voice", deps.InterviewHandler.SendVoice)
 			interviews.GET("/:id/tts/:msgId", deps.InterviewHandler.GetTTS)
 			interviews.POST("/:id/end", deps.InterviewHandler.End)

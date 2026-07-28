@@ -178,12 +178,12 @@ func (h *InterviewHandler) SendVoice(c *gin.Context) {
 	}
 	defer file.Close()
 
-	if !utils.IsAudioExt(header.Filename) {
-		utils.BadRequest(c, "unsupported audio format, only mp3/wav/m4a/webm/ogg allowed")
+	if !utils.IsMimoASRExt(header.Filename) {
+		utils.BadRequest(c, "unsupported audio format, MiMo ASR only accepts mp3/wav")
 		return
 	}
-	if !utils.ValidateFileSize(header.Size, 25) {
-		utils.BadRequest(c, "audio size exceeds 25MB limit")
+	if !utils.ValidateFileSize(header.Size, 7) {
+		utils.BadRequest(c, "audio size exceeds MiMo ASR limit")
 		return
 	}
 
@@ -228,6 +228,43 @@ func (h *InterviewHandler) SendVoice(c *gin.Context) {
 		fmt.Fprintf(c.Writer, "data: %s\n\n", doneData)
 	}
 	flusher.Flush()
+}
+
+// TranscribeVoice POST /api/v1/interviews/:id/transcribe 仅转写语音草稿。
+// 此接口不创建面试回答、不增加题号，也不生成下一题。
+func (h *InterviewHandler) TranscribeVoice(c *gin.Context) {
+	userID := c.GetUint(middleware.ContextUserID)
+	interviewID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+
+	file, header, err := c.Request.FormFile("audio")
+	if err != nil {
+		utils.BadRequest(c, "audio field is required: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	if !utils.IsMimoASRExt(header.Filename) {
+		utils.BadRequest(c, "unsupported audio format, MiMo ASR only accepts mp3/wav")
+		return
+	}
+	if !utils.ValidateFileSize(header.Size, 7) {
+		utils.BadRequest(c, "audio size exceeds MiMo ASR limit")
+		return
+	}
+
+	text, err := h.svc.TranscribeVoice(c.Request.Context(), userID, uint(interviewID), file, header.Filename)
+	if err != nil {
+		switch err {
+		case services.ErrInterviewNotFound:
+			utils.NotFound(c, err.Error())
+		case services.ErrInterviewEnded:
+			utils.Conflict(c, err.Error())
+		default:
+			utils.InternalError(c, err.Error())
+		}
+		return
+	}
+	utils.OK(c, gin.H{"text": text})
 }
 
 // GetTTS GET /api/v1/interviews/:id/tts/:msgId 获取 AI 提问的 TTS 音频

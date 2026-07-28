@@ -465,6 +465,23 @@ func (s *InterviewService) SendVoice(ctx context.Context, userID, interviewID ui
 	return s.askNextQuestionWithStream(ctx, interview, interview.CurrentQuestionNo+1, onDelta)
 }
 
+// TranscribeVoice 仅转写语音草稿，不创建回答消息，也不推进面试进度。
+func (s *InterviewService) TranscribeVoice(ctx context.Context, userID, interviewID uint, audio io.Reader, filename string) (string, error) {
+	interview, err := s.Get(userID, interviewID)
+	if err != nil {
+		return "", err
+	}
+	if interview.Status != StatusOngoing {
+		return "", ErrInterviewEnded
+	}
+
+	transcribed, err := s.llm.Transcribe(ctx, audio, filename)
+	if err != nil {
+		return "", fmt.Errorf("transcribe: %w", err)
+	}
+	return transcribed, nil
+}
+
 // transcribeFromPath 转写用户上传的语音回答
 // 模型：cfg.WhisperModel → "mimo-v2.5-asr"（语音识别）
 func (s *InterviewService) transcribeFromPath(ctx context.Context, absPath string) (string, error) {
