@@ -1,0 +1,276 @@
+.app-layout {
+  --primary: #1757d2;
+  --brand-50: #edf2ff;
+  --brand-500: #1757d2;
+  --brand-600: #0d47bb;
+  --background-50: #ffffff;
+  --background-100: #f4f5f2;
+  --background-200: #eceeeb;
+  --background-300: #d8dce1;
+  --foreground: #151a23;
+  --muted-foreground: #68717e;
+  --border: #d8dce1;
+  --card: #ffffff;
+  --radius: 0.5rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  min-height: 100vh;
+  background: #f4f5f2;
+}
+
+.main-layout {
+  min-width: 0;
+  flex: 1 1 0;
+  background: #f4f5f2;
+}
+
+/* ===== 侧边栏：Pinguo 设计稿对齐 ===== */
+.app-sider {
+  background: #f0f1ee !important;
+  border-right: 1px solid #d8dce1;
+  box-shadow: none !important;
+  z-index: 10;
+  position: sticky !important;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+}
+
+.app-sider :deep(.ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px 10px;
+}
+
+.logo {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  border-bottom: 1px solid #d7dbdf;
+  justify-content: flex-start;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #151a23;
+  padding: 0;
+  box-shadow: none;
+}
+
+.unified-brand-mark {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sidebar-foreground);
+  margin-left: 0;
+}
+
+/* ===== 导航菜单：覆盖 Ant Design 默认样式 ===== */
+.app-sider :deep(.ant-menu) {
+  background: transparent;
+  border-right: 0;
+  padding-top: 14px;
+  gap: 4px;
+}
+
+.app-sider :deep(.ant-menu-item) {
+  min-height: 50px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sidebar-foreground);
+  margin: 0 0 4px 0;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.app-sider :deep(.ant-menu-item:hover) {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-foreground);
+}
+
+.app-sider :deep(.ant-menu-item-selected) {
+  background: rgba(255, 255, 255, 0.66) !important;
+  color: var(--primary) !important;
+  box-shadow: none;
+}
+
+.app-sider :deep(.ant-menu-item-selected::after) {
+  display: none;
+}
+
+.app-sider :deep(.ant-menu-item .anticon) {
+  font-size: 18px;
+}
+
+/* ===== 自定义折叠按钮（仿菜单项样式） ===== */
+.sider-footer {
+  margin-top: auto;
+  padding: 14px 4px 6px;
+  border-top: 1px solid #d7dbdf;
+}
+.collapse-btn {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-foreground);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.collapse-btn:hover {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-foreground);
+}
+.collapse-btn :deep(.anticon) {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.collapse-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 折叠状态下居中显示图标 */
+.app-sider.ant-layout-sider-collapsed .collapse-btn {
+  justify-content: center;
+  padding: 0;
+}
+.sider-copyright {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin: 8px 0 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+  white-space: nowrap;
+}
+.app-sider.ant-layout-sider-collapsed .sider-copyright {
+  font-size: 9px;
+}
+
+/* ===== 顶部栏 ===== */
+.app-header {
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #d8dce1;
+  box-shadow: none;
+  height: 64px;
+  z-index: 9;
+  position: sticky;
+  top: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-left :deep(.ant-breadcrumb) {
+  font-size: 14px;
+}
+
+.header-left :deep(.ant-breadcrumb a) {
+  color: var(--muted-foreground);
+}
+
+.header-left :deep(.ant-breadcrumb-separator) {
+  color: var(--muted-foreground);
+}
+
+.header-left :deep(.ant-breadcrumb > span:last-child) {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background-color 0.18s ease;
+  gap: 10px;
+}
+
+.user-info:hover {
+  background-color: var(--background-200);
+}
+
+:global(.user-dropdown-overlay .ant-dropdown-menu) {
+  box-shadow: var(--shadow-lg);
+}
+
+.avatar {
+  border-radius: 8px !important;
+  background-color: var(--brand-50) !important;
+  color: var(--primary) !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-name {
+  margin-left: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.arrow-icon {
+  margin-left: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* ===== 内容区 ===== */
+.app-content {
+  box-sizing: border-box;
+  min-width: 0;
+  width: auto;
+  margin: 26px 30px 40px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border: 0;
+  min-height: calc(100vh - 64px - 48px);
+  box-shadow: none;
+}
+
