@@ -65,7 +65,10 @@ const (
 	ModeHybrid = "hybrid"
 )
 
-const maxResumePromptRunes = 12000
+const (
+	maxResumePromptRunes   = 12000
+	maxFollowupPromptRunes = 2000
+)
 
 // InterviewService 面试业务逻辑
 type InterviewService struct {
@@ -650,8 +653,11 @@ func (s *InterviewService) askNextQuestionWithStream(ctx context.Context, interv
 			messages = append(messages, ChatMessage{Role: "user", Content: m.Content})
 		}
 	}
-	// 提示 AI 出下一题
-	messages = append(messages, ChatMessage{Role: "user", Content: fmt.Sprintf("（请出第 %d 题，只问一个问题）", questionNo)})
+	// 明确要求下一题对上一题回答作出反应，而不是只依赖通用题库。
+	messages = append(messages, ChatMessage{
+		Role:    "user",
+		Content: buildNextQuestionInstruction(history, questionNo),
+	})
 
 	// 5. 调 LLM
 	var aiContent string
@@ -693,6 +699,53 @@ func (s *InterviewService) askNextQuestionWithStream(ctx context.Context, interv
 	s.db.Model(interview).Update("current_question_no", questionNo)
 
 	return aiMsg, nil
+}
+
+func buildNextQuestionInstruction(history []models.InterviewMessage, questionNo int) string {
+	if questionNo <= 1 {
+		return fmt.Sprintf("请出第 %d 题，只问一个问题。面试过程中不要评价、打分或讲解答案。", questionNo)
+	}
+
+	var previousQuestion, latestAnswer string
+	for i := len(history) - 1; i >= 0; i-- {
+		msg := history[i]
+		if latestAnswer == "" && msg.Role == "user" {
+			latestAnswer = strings.TrimSpace(msg.Content)
+			continue
+		}
+		if latestAnswer != "" && msg.Role == "assistant" {
+			previousQuestion = strings.TrimSpace(msg.Content)
+			break
+		}
+	}
+
+	if latestAnswer == "" {
+		return fmt.Sprintf("请出第 %d 题，只问一个问题。面试过程中不要评价、打分或讲解答案。", questionNo)
+	}
+
+	return fmt.Sprintf(`请出第 %d 题，并明确基于候选人刚才的回答决定提问方向。
+
+上一题：%s
+候选人回答：%s
+
+决策规则：
+1. 回答含糊、缺少数据、逻辑跳跃或存在矛盾时，针对其中一个具体缺口继续追问。
+2. 回答充分时，从回答中提到的项目、技术选择、结果或反思自然过渡到更深入的新问题。
+3. 下一题必须与回答中的具体信息存在可解释的联系，不得无视回答机械切换到通用题库。
+4. 只输出一个自然、真实的面试问题；不要复述整段回答，不要评价、打分、纠正或讲解答案。
+5. 所有逐题评价统一留到面试结束后的总体报告。`,
+		questionNo,
+		nonEmpty(limitPromptRunes(previousQuestion, maxFollowupPromptRunes), "（未找到上一题文本）"),
+		limitPromptRunes(latestAnswer, maxFollowupPromptRunes),
+	)
+}
+
+func limitPromptRunes(value string, maxRunes int) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= maxRunes {
+		return string(runes)
+	}
+	return string(runes[:maxRunes]) + "…"
 }
 
 // buildInterviewerPrompt 构造面试官 system prompt
@@ -744,11 +797,12 @@ func (s *InterviewService) buildInterviewerPrompt(interview *models.Interview, q
 
 面试规则：
 1. 一次只问一个问题
-2. 根据候选人回答质量决定追问或换题——回答模糊或浅显时连续追问，回答充分时切换话题
+2. 每道后续问题都必须考虑候选人上一题的回答内容；回答模糊时追问具体缺口，回答充分时从其提到的事实自然深入或切换
 3. 结合以下 JD 关键词出题
 4. 难度递增
 5. 模拟真实面试官语气，不要透露你是 AI
 6. 如果是教资模拟教室：前两题进行结构化问答，中间两题要求候选人围绕抽题主题完成试讲片段，最后一题以考官身份针对教学设计进行答辩追问
+7. 面试进行中只负责提问，不即时评价、打分、纠正或公布参考答案；所有逐题评价在面试结束后的总体报告中统一给出
 
 企业风格提示：根据你对 %s 面试风格的了解调整出题策略（如字节跳动注重底层原理与项目深挖，阿里注重系统设计，腾讯注重技术广度等；若不确定则按通用标准）。
 
@@ -906,7 +960,14 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 
 如果候选人发送了简历，请在复盘报告中结合简历内容评估其经历表达与岗位匹配度。
 
-请逐题回顾候选人的回答表现，对每一道题给出评价。question_no 从 1 开始；第一题通常是开场题，也需要评价。score 为该题的独立百分制评分（0-100），comment 指出回答的亮点与不足，suggestion 给出更优回答方向。
+请逐题回顾候选人的回答表现，并把详细评价集中写入 question_feedback：
+- 只评价已经收到候选人回答的题目，按真实对话顺序逐题匹配，不得虚构题目或回答。
+- question_feedback 条目数量必须与候选人已回答题数一致，question_no 使用原题号。
+- question 保留面试官原题；answer 准确概括候选人实际回答，不得替候选人补充不存在的经历。
+- score 是该题独立百分制评分（0-100）。
+- comment 具体指出内容完整性、逻辑、证据、表达上的亮点与不足，避免“回答不错”等空泛结论。
+- suggestion 给出可执行的更优回答结构、应补数据或关键要点。
+- 总体 summary、highlights、improvements 必须与逐题评价保持一致。
 
 返回 JSON：
 {

@@ -243,3 +243,42 @@ func TestStorageURLWithAbsoluteBase(t *testing.T) {
 		t.Fatal("storageURL() accepted path outside storage base")
 	}
 }
+
+func TestBuildNextQuestionInstructionUsesLatestAnswer(t *testing.T) {
+	history := []models.InterviewMessage{
+		{Role: "assistant", Content: "请介绍一个你负责的项目。"},
+		{Role: "user", Content: "我负责过旧项目。"},
+		{Role: "assistant", Content: "你为什么在新系统中选择 Redis？"},
+		{Role: "user", Content: "因为缓存命中率达到 92%，但当时没有处理热 key。"},
+	}
+
+	instruction := buildNextQuestionInstruction(history, 3)
+	for _, expected := range []string{
+		"你为什么在新系统中选择 Redis",
+		"缓存命中率达到 92%",
+		"没有处理热 key",
+		"不得无视回答机械切换到通用题库",
+		"所有逐题评价统一留到面试结束后的总体报告",
+	} {
+		if !strings.Contains(instruction, expected) {
+			t.Fatalf("instruction missing %q:\n%s", expected, instruction)
+		}
+	}
+	if strings.Contains(instruction, "我负责过旧项目") {
+		t.Fatalf("instruction included an older answer:\n%s", instruction)
+	}
+}
+
+func TestBuildNextQuestionInstructionLimitsAnswerLength(t *testing.T) {
+	longAnswer := strings.Repeat("答", maxFollowupPromptRunes+100)
+	instruction := buildNextQuestionInstruction([]models.InterviewMessage{
+		{Role: "assistant", Content: "上一题"},
+		{Role: "user", Content: longAnswer},
+	}, 2)
+	if !strings.Contains(instruction, "…") {
+		t.Fatalf("long answer was not truncated")
+	}
+	if strings.Contains(instruction, strings.Repeat("答", maxFollowupPromptRunes+1)) {
+		t.Fatalf("instruction kept more than the configured answer limit")
+	}
+}
