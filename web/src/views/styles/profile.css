@@ -1,0 +1,46 @@
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.completion-card {
+  border-radius: 8px;
+}
+
+.completion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.completion-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #262626;
+}
+
+.completion-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.section-card {
+  border-radius: 8px;
+}
+
+.upload-tip {
+  margin-left: 12px;
+  color: #999;
+  font-size: 13px;
+}
+
+.form-actions {
+  margin-top: 8px;
+}
+
+.tab-toolbar {
+  margin-bottom: 12px;
+}

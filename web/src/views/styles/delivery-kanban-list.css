@@ -1,0 +1,325 @@
+/* ===== 主体布局 ===== */
+.content-flex {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.content-flex.platform-mode {
+  flex-direction: column;
+}
+.content-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ===== 表格 ===== */
+.kb-table-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.kb-table-scroll {
+  overflow-x: auto;
+}
+.kb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 980px;
+}
+.kb-table thead th {
+  background: var(--background-200);
+  color: var(--muted-foreground);
+  font-weight: 600;
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.02em;
+}
+.kb-table tbody td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--foreground);
+}
+.kb-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.kb-table tbody tr {
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.kb-table tbody tr:hover {
+  background: var(--background-100);
+}
+.kb-table tbody tr.selected {
+  background: var(--brand-50);
+}
+.kb-table tbody tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.kb-table .mono {
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.kb-company-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kb-company {
+  font-weight: 700;
+  color: var(--foreground);
+}
+.kb-remark-dot {
+  color: var(--muted-foreground);
+}
+.kb-feedback-cell {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kb-dash {
+  color: var(--background-400);
+}
+
+/* 渠道标签 */
+.kb-channel {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+.ch-boss {
+  background: var(--brand-50);
+  color: var(--primary);
+}
+.ch-referral {
+  background: rgba(175, 82, 222, 0.14);
+  color: #8e3db5;
+}
+.ch-official {
+  background: rgba(88, 86, 214, 0.14);
+  color: #5856d6;
+}
+.ch-campus {
+  background: var(--state-success-surface);
+  color: var(--success);
+}
+.ch-headhunt {
+  background: rgba(255, 149, 0, 0.14);
+  color: #c46900;
+}
+.ch-other {
+  background: var(--background-200);
+  color: var(--muted-foreground);
+}
+
+/* 下次面试 */
+.kb-next-interview {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--brand-50);
+  padding: 3px 8px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* 状态标签 */
+.kb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kb-status .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kb-status.gray {
+  background: rgba(174, 174, 178, 0.18);
+  color: var(--background-600);
+}
+.kb-status.gray .status-dot {
+  background: var(--background-600);
+}
+.kb-status.blue {
+  background: var(--brand-50);
+  color: var(--primary);
+}
+.kb-status.blue .status-dot {
+  background: var(--primary);
+}
+.kb-status.orange {
+  background: rgba(255, 149, 0, 0.14);
+  color: #c46900;
+}
+.kb-status.orange .status-dot {
+  background: #ff9500;
+}
+.kb-status.purple {
+  background: rgba(175, 82, 222, 0.14);
+  color: #8e3db5;
+}
+.kb-status.purple .status-dot {
+  background: #af52de;
+}
+.kb-status.green {
+  background: var(--state-success-surface);
+  color: var(--success);
+}
+.kb-status.green .status-dot {
+  background: var(--success);
+}
+.kb-status.red {
+  background: var(--state-error-surface);
+  color: var(--destructive);
+}
+.kb-status.red .status-dot {
+  background: var(--destructive);
+}
+
+/* 进度点 */
+.kb-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.kb-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--background-400);
+}
+.kb-dots .dot.done {
+  background: var(--primary);
+}
+.kb-dots .dot.current {
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--primary) inset;
+}
+.kb-dots .dot.fail {
+  background: var(--destructive);
+}
+
+/* 优先级 */
+.kb-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 3px 9px;
+  border-radius: 9999px;
+}
+.kb-priority.high {
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--destructive);
+}
+.kb-priority.mid {
+  background: rgba(255, 149, 0, 0.12);
+  color: #c46900;
+}
+.kb-priority.low {
+  background: var(--background-200);
+  color: var(--muted-foreground);
+}
+
+/* 操作按钮 */
+.kb-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 14px;
+}
+.kb-action:hover {
+  background: var(--background-200);
+  color: var(--foreground);
+}
+.kb-action-sm {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+/* ===== 移动端卡片 ===== */
+.kb-cards-mobile {
+  display: none;
+}
+.kb-mobile-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+.kb-mobile-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+.kb-mobile-card.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--brand-50);
+}
+.kb-mobile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.kb-mobile-pos {
+  font-size: 13px;
+  color: var(--foreground);
+  margin-bottom: 8px;
+}
+.kb-mobile-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 11px;
+}
+.kb-mobile-foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kb-mobile-fb {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}

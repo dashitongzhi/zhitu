@@ -1,0 +1,526 @@
+  <div class="interview-room-page">
+    <a-spin :spinning="interviewStore.loading" tip="加载面试...">
+      <!-- 顶部信息栏 -->
+      <div class="room-header">
+        <div class="header-left">
+          <a-button @click="backToList">
+            <ArrowLeftOutlined /> 返回
+          </a-button>
+          <div class="interview-meta" v-if="interviewStore.currentInterview">
+            <a-tag :color="sceneColor(interviewStore.currentInterview.scene)">
+              {{ sceneLabel(interviewStore.currentInterview.scene) }}
+            </a-tag>
+            <span class="meta-text">
+              {{ interviewStore.currentInterview.target_company || '未指定' }}
+              · {{ interviewStore.currentInterview.target_position }}
+            </span>
+            <a-tag>{{ difficultyLabel(interviewStore.currentInterview.difficulty) }}</a-tag>
+            <a-tag :color="modeColor(interviewStore.currentInterview.mode)">
+              {{ modeLabel(interviewStore.currentInterview.mode) }}
+            </a-tag>
+            <a-divider type="vertical" />
+            <span class="meta-progress">
+              进度：{{ interviewStore.currentInterview.current_question_no }}
+              / {{ interviewStore.currentInterview.total_questions }}
+            </span>
+            <a-badge
+              :status="statusBadge(interviewStore.currentInterview.status)"
+              :text="statusLabel(interviewStore.currentInterview.status)"
+            />
+          </div>
+        </div>
+        <div class="header-right">
+          <a-button
+            v-if="interviewStore.currentInterview?.status === 'ongoing'"
+            danger
+            @click="handleEndInterview"
+          >
+            <PoweroffOutlined /> 结束面试
+          </a-button>
+        </div>
+      </div>
+
+      <section v-if="isTeachingScene" class="classroom-stage">
+        <div class="stage-meta">
+          <span>模拟教室</span>
+          <strong>{{ currentTeachingPhase }}</strong>
+          <small>第 {{ interviewStore.currentInterview?.current_question_no || 1 }} 环节</small>
+        </div>
+        <div class="examiner-bench">
+          <div class="examiner-person side"><i>考</i><span>学科考官</span></div>
+          <div class="examiner-person lead"><i>主</i><span>主考官</span></div>
+          <div class="examiner-person side"><i>记</i><span>记录员</span></div>
+        </div>
+        <div class="teaching-board">
+          <span>当前考题</span>
+          <p>{{ latestQuestion }}</p>
+          <div class="chalk-line"></div>
+        </div>
+        <div class="candidate-position">
+          <span>考生位置</span>
+          <strong>请面向考官开始作答</strong>
+        </div>
+        <div class="stage-timer">
+          <ClockCircleOutlined />
+          <span>本环节建议</span>
+          <strong>{{ teachingTimeHint }}</strong>
+        </div>
+      </section>
+
+      <!-- 主体：左消息流 + 右信息/复盘 -->
+      <a-row :gutter="16" class="room-body">
+        <!-- 左侧消息流 -->
+        <a-col :span="16">
+          <a-card class="chat-card" :bordered="false" :body-style="{ padding: '0' }">
+            <template #title>
+              <span><MessageOutlined /> 面试对话</span>
+            </template>
+
+            <!-- 消息列表 -->
+            <div class="chat-messages" ref="messagesContainer">
+              <a-empty
+                v-if="interviewStore.messages.length === 0"
+                description="暂无消息"
+                class="chat-empty"
+              />
+              <div
+                v-for="msg in displayMessages"
+                :key="msg.id"
+                :class="['msg-row', msg.role]"
+              >
+                <div class="msg-avatar">
+                  <a-avatar :size="32" :style="avatarStyle(msg.role)">
+                    {{ avatarText(msg.role) }}
+                  </a-avatar>
+                </div>
+                <div class="msg-bubble-wrap">
+                  <div class="msg-meta">
+                    <span class="msg-role">{{ roleLabel(msg.role) }}</span>
+                    <span v-if="msg.question_no > 0" class="msg-qno">
+                      第 {{ msg.question_no }} 题
+                    </span>
+                    <span v-if="msg.question_type" class="msg-qtype">
+                      · {{ msg.question_type }}
+                    </span>
+                    <span v-if="msg.duration_sec > 0" class="msg-duration">
+                      · {{ msg.duration_sec }}s
+                    </span>
+                    <!-- TTS 播放按钮：仅 assistant 消息 + mode 为 voice/hybrid -->
+                    <a-button
+                      v-if="canPlayTts && msg.role === 'assistant'"
+                      type="link"
+                      size="small"
+                      @click="handlePlayTts(msg)"
+                    >
+                      <SoundOutlined />
+                      {{ speakingMessageId === msg.id ? '停止' : '播放' }}
+                    </a-button>
+                  </div>
+                  <div class="msg-bubble">
+                    {{ msg.content }}
+                  </div>
+                  <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
+                </div>
+              </div>
+
+              <!-- 流式 AI 回复占位 -->
+              <div v-if="interviewStore.streamingText" class="msg-row assistant">
+                <div class="msg-avatar">
+                  <a-avatar :size="32" style="background: #1890ff">AI</a-avatar>
+                </div>
+                <div class="msg-bubble-wrap">
+                  <div class="msg-meta">
+                    <span class="msg-role">AI 助手</span>
+                    <a-spin :spinning="interviewStore.sending" size="small" />
+                  </div>
+                  <div class="msg-bubble streaming-bubble">
+                    {{ interviewStore.streamingText }}
+                    <span class="cursor-blink">|</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 输入区 -->
+            <div class="chat-input-area" v-if="isOngoing">
+              <a-textarea
+                v-model:value="inputText"
+                :rows="3"
+                :placeholder="audioDraft ? '录音已作为音频文件加入，可转成文字后编辑' : '输入你的回答...'"
+                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !!audioDraft"
+                @keydown.enter.exact.prevent="handleSendAnswer"
+              />
+              <div v-if="audioDraft" class="audio-draft-card">
+                <div class="audio-draft-main">
+                  <div class="audio-file-icon"><AudioOutlined /></div>
+                  <div class="audio-file-info">
+                    <strong>{{ audioDraft.file.name }}</strong>
+                    <span>
+                      WAV · {{ formatDuration(audioDraft.durationSeconds) }}
+                      · {{ formatFileSize(audioDraft.file.size) }}
+                    </span>
+                  </div>
+                  <audio :src="audioDraft.objectUrl" controls preload="metadata"></audio>
+                </div>
+                <div class="audio-draft-actions">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :loading="transcribingDraft"
+                    :disabled="interviewStore.sending"
+                    @click="handleTranscribeDraft"
+                  >
+                    转化为文本
+                  </a-button>
+                  <a-button
+                    type="link"
+                    size="small"
+                    :disabled="transcribingDraft || interviewStore.sending"
+                    @click="rerecordVoice"
+                  >
+                    重新录制
+                  </a-button>
+                  <a-button
+                    type="text"
+                    danger
+                    size="small"
+                    :disabled="transcribingDraft || interviewStore.sending"
+                    @click="clearAudioDraft"
+                  >
+                    删除
+                  </a-button>
+                  <small>可先转成文字并编辑，也可直接点击发送，由后台转写后继续分析。</small>
+                </div>
+              </div>
+              <div class="input-toolbar">
+                <div class="toolbar-left">
+                  <!-- 麦克风录音（mode 为 voice/hybrid 时可用） -->
+                  <a-button
+                    v-if="canSendVoice"
+                    :danger="isRecording"
+                    :loading="voicePreparing || recordingFinalizing"
+                    :disabled="interviewStore.sending || voicePreparing || recordingFinalizing || !!audioDraft"
+                    :class="{ 'recording-button': isRecording }"
+                    @click="toggleVoiceRecording"
+                  >
+                    <AudioOutlined />
+                    <span v-if="voicePreparing">正在获取麦克风</span>
+                    <span v-else-if="recordingFinalizing">正在生成录音</span>
+                    <span v-else-if="isRecording">结束录音 {{ recordingTimeLabel }}</span>
+                    <span v-else>语音回答</span>
+                  </a-button>
+                  <!-- 发送简历：把简历绑定到本次面试，AI 后续提问会结合简历内容 -->
+                  <a-button
+                    :type="resumeAttached ? 'default' : 'dashed'"
+                    :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !isOngoing"
+                    @click="openResumeModal"
+                  >
+                    <FileTextOutlined />
+                    <span v-if="resumeAttached">简历已发送</span>
+                    <span v-else>发送简历</span>
+                  </a-button>
+                  <span class="input-hint">Enter 发送 · Shift+Enter 换行</span>
+                </div>
+                <div class="toolbar-right">
+                  <a-button
+                    type="primary"
+                    :loading="interviewStore.sending"
+                    :disabled="(!inputText.trim() && !audioDraft) || isRecording || voicePreparing || recordingFinalizing || transcribingDraft"
+                    @click="handleSendAnswer"
+                  >
+                    <SendOutlined /> 发送
+                  </a-button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="chat-input-disabled">
+              <a-alert
+                :message="`面试已${interviewStore.currentInterview?.status === 'completed' ? '完成' : '取消'}，请在右侧查看复盘报告`"
+                type="info"
+                show-icon
+              />
+            </div>
+          </a-card>
+        </a-col>
+
+        <!-- 右侧信息/复盘 -->
+        <a-col :span="8">
+          <a-card class="side-card" :bordered="false">
+            <a-tabs v-model:activeKey="sideTab">
+              <!-- 面试信息 -->
+              <a-tab-pane key="info" tab="面试信息">
+                <div v-if="interviewStore.currentInterview" class="info-block">
+                  <a-descriptions :column="1" size="small" bordered>
+                    <a-descriptions-item label="场景">
+                      {{ sceneLabel(interviewStore.currentInterview.scene) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="目标公司">
+                      {{ interviewStore.currentInterview.target_company || '未指定' }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="目标职位">
+                      {{ interviewStore.currentInterview.target_position }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="难度">
+                      {{ difficultyLabel(interviewStore.currentInterview.difficulty) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="模式">
+                      {{ modeLabel(interviewStore.currentInterview.mode) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="进度">
+                      {{ interviewStore.currentInterview.current_question_no }}
+                      / {{ interviewStore.currentInterview.total_questions }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="状态">
+                      <a-badge
+                        :status="statusBadge(interviewStore.currentInterview.status)"
+                        :text="statusLabel(interviewStore.currentInterview.status)"
+                      />
+                    </a-descriptions-item>
+                    <a-descriptions-item label="开始时间">
+                      {{ formatTime(interviewStore.currentInterview.started_at) }}
+                    </a-descriptions-item>
+                    <a-descriptions-item label="结束时间">
+                      {{ formatTime(interviewStore.currentInterview.ended_at) }}
+                    </a-descriptions-item>
+                  </a-descriptions>
+
+                  <div v-if="interviewStore.currentInterview.target_jd" class="jd-block">
+                    <div class="block-title">目标 JD</div>
+                    <div class="jd-content">
+                      {{ interviewStore.currentInterview.target_jd }}
+                    </div>
+                  </div>
+
+                  <div class="resume-block-info">
+                    <div class="block-title">已发送简历</div>
+                    <a-alert
+                      v-if="resumeAttached"
+                      type="success"
+                      show-icon
+                      :message="`简历：${interviewStore.currentInterview.resume_name || '未命名简历'}`"
+                      description="已绑定至本次面试。"
+                    />
+                    <a-empty
+                      v-else
+                      description="尚未发送简历，可在输入区点击「发送简历」绑定"
+                      :image="simpleImage"
+                    />
+                  </div>
+                </div>
+                <a-empty v-else description="暂无信息" />
+              </a-tab-pane>
+
+              <!-- 复盘报告 -->
+              <a-tab-pane key="report" tab="复盘报告" :disabled="!isCompleted">
+                <a-spin :spinning="reportLoading" tip="加载报告...">
+                  <div v-if="interviewStore.report" class="report-block">
+                    <a-statistic
+                      title="整体评分"
+                      :value="interviewStore.report.overall_score"
+                      suffix="/ 100"
+                      :value-style="scoreStyle(interviewStore.report.overall_score)"
+                      class="overall-score"
+                    />
+                    <div class="block-title">综合评语</div>
+                    <a-typography-paragraph>
+                      {{ interviewStore.report.summary }}
+                    </a-typography-paragraph>
+
+                    <div class="block-title">逐题详细复盘</div>
+                    <div
+                      v-if="questionFeedbackItems.length"
+                      class="question-feedback-list"
+                    >
+                      <article
+                        v-for="item in questionFeedbackItems"
+                        :key="item.question_no"
+                        class="question-feedback-card"
+                      >
+                        <header>
+                          <strong>第 {{ item.question_no }} 题</strong>
+                          <a-tag :color="scoreTagColor(item.score)">
+                            {{ item.score }} 分
+                          </a-tag>
+                        </header>
+                        <div class="feedback-section">
+                          <span>面试题</span>
+                          <p>{{ item.question || '未记录题目文本' }}</p>
+                        </div>
+                        <div class="feedback-section">
+                          <span>你的回答</span>
+                          <p>{{ item.answer || '未记录回答文本' }}</p>
+                        </div>
+                        <div class="feedback-section">
+                          <span>本题评价</span>
+                          <p>{{ item.comment || '暂无详细评价' }}</p>
+                        </div>
+                        <div class="feedback-section suggestion">
+                          <span>优化方向</span>
+                          <p>{{ item.suggestion || '暂无优化建议' }}</p>
+                        </div>
+                      </article>
+                    </div>
+                    <a-empty
+                      v-else
+                      description="暂无逐题评价"
+                      :image="simpleImage"
+                    />
+
+                    <div class="block-title">亮点</div>
+                    <a-list
+                      v-if="parseJsonArray(interviewStore.report.highlights).length"
+                      size="small"
+                      :data-source="parseJsonArray(interviewStore.report.highlights)"
+                    >
+                      <template #renderItem="{ item }">
+                        <a-list-item>
+                          <CheckCircleOutlined style="color: #52c41a" />
+                          <span class="list-item-text">{{ item }}</span>
+                        </a-list-item>
+                      </template>
+                    </a-list>
+                    <a-empty v-else description="无" :image="simpleImage" />
+
+                    <div class="block-title">改进建议</div>
+                    <a-list
+                      v-if="parseJsonArray(interviewStore.report.improvements).length"
+                      size="small"
+                      :data-source="parseJsonArray(interviewStore.report.improvements)"
+                    >
+                      <template #renderItem="{ item }">
+                        <a-list-item>
+                          <WarningOutlined style="color: #faad14" />
+                          <span class="list-item-text">{{ item }}</span>
+                        </a-list-item>
+                      </template>
+                    </a-list>
+                    <a-empty v-else description="无" :image="simpleImage" />
+
+                    <div class="block-title">推荐资源</div>
+                    <a-list
+                      v-if="parseJsonArray(interviewStore.report.recommendations).length"
+                      size="small"
+                      :data-source="parseJsonArray(interviewStore.report.recommendations)"
+                    >
+                      <template #renderItem="{ item }">
+                        <a-list-item>
+                          <BulbOutlined style="color: #1890ff" />
+                          <span class="list-item-text">{{ item }}</span>
+                        </a-list-item>
+                      </template>
+                    </a-list>
+                    <a-empty v-else description="无" :image="simpleImage" />
+                  </div>
+                  <a-empty
+                    v-else-if="!reportLoading"
+                    description="暂无报告，请先结束面试"
+                    :image="simpleImage"
+                  />
+                </a-spin>
+              </a-tab-pane>
+
+              <!-- 评分明细 -->
+              <a-tab-pane key="scores" tab="评分明细" :disabled="!isCompleted">
+                <a-spin :spinning="scoresLoading" tip="加载评分...">
+                  <a-table
+                    v-if="interviewStore.scores.length > 0"
+                    :columns="scoreColumns"
+                    :data-source="interviewStore.scores"
+                    :pagination="false"
+                    row-key="id"
+                    size="small"
+                  >
+                    <template #bodyCell="{ column, record }">
+                      <template v-if="column.key === 'dimension'">
+                        {{ dimensionLabel(record.dimension) }}
+                      </template>
+                      <template v-else-if="column.key === 'score'">
+                        <a-tag :color="scoreTagColor(record.score)">{{ record.score }}</a-tag>
+                      </template>
+                    </template>
+                  </a-table>
+                  <a-empty
+                    v-else-if="!scoresLoading"
+                    description="暂无评分明细"
+                    :image="simpleImage"
+                  />
+                </a-spin>
+              </a-tab-pane>
+            </a-tabs>
+          </a-card>
+        </a-col>
+      </a-row>
+    </a-spin>
+
+    <!-- 发送简历弹窗：选择简历 + 版本 -->
+    <a-modal
+      v-model:open="resumeModalVisible"
+      title="发送简历给 AI 面试官"
+      ok-text="发送简历"
+      cancel-text="取消"
+      :ok-button-props="{ loading: attaching, disabled: !selectedResumeId }"
+      :cancel-button-props="{ disabled: attaching }"
+      :mask-closable="false"
+      width="520px"
+      @ok="confirmAttachResume"
+    >
+      <a-spin :spinning="loadingResumes" tip="加载简历列表...">
+        <a-empty
+          v-if="!loadingResumes && resumeList.length === 0"
+          description="还没有简历，请先到「简历实验室」创建简历"
+        >
+          <a-button type="primary" @click="goToResumeLab">前往简历实验室</a-button>
+        </a-empty>
+        <div v-else class="resume-modal-body">
+          <p class="modal-tip">
+            选择一份简历绑定到本次面试。
+          </p>
+          <a-form layout="vertical">
+            <a-form-item label="选择简历">
+              <a-select
+                v-model:value="selectedResumeId"
+                placeholder="请选择简历"
+                :disabled="attaching"
+                @change="onResumeChange"
+              >
+                <a-select-option
+                  v-for="r in resumeList"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }}
+                  <span class="resume-meta">
+                    （{{ r.target_position || '未指定岗位' }}）
+                  </span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="选择版本">
+              <a-select
+                v-model:value="selectedVersionId"
+                placeholder="默认使用当前版本"
+                :disabled="attaching || !selectedResumeId || loadingVersions"
+                :loading="loadingVersions"
+              >
+                <a-select-option :value="0">当前版本</a-select-option>
+                <a-select-option
+                  v-for="v in versionList"
+                  :key="v.id"
+                  :value="v.id"
+                >
+                  {{ v.version_label }}
+                  <span class="resume-meta">· {{ formatVersionTime(v.created_at) }}</span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+          <a-alert
+            v-if="resumeAttached"
+            type="info"
+            show-icon
+            message="本次面试已绑定过简历，再次发送将覆盖之前绑定的简历。"
+          />
+        </div>
+      </a-spin>
+    </a-modal>
+  </div>

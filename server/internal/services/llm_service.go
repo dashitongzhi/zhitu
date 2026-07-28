@@ -8,16 +8,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zhitu/server/internal/config"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/zhitu/server/internal/config"
 )
 
-// LLMService 封装 OpenAI 兼容接口的调用
+// LLMService 封装 OpenAI Chat Completions 与 Anthropic Messages 接口的调用
 // 直接用 net/http，不引入第三方 SDK，便于切换 provider
 type LLMService struct {
 	cfg    *config.LLMConfig
@@ -26,7 +24,7 @@ type LLMService struct {
 
 // ChatMessage OpenAI Chat Completions 消息格式
 type ChatMessage struct {
-	Role    string `json:"role"`    // system / user / assistant
+	Role    string `json:"role"` // system / user / assistant
 	Content string `json:"content"`
 }
 
@@ -45,16 +43,20 @@ type respFormat struct {
 	Type string `json:"type"` // "json_object"
 }
 
+type chatResponseMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type chatResponseChoice struct {
+	Message      chatResponseMessage `json:"message"`
+	FinishReason string              `json:"finish_reason"`
+}
+
 // chatResponse 非流式响应体
 type chatResponse struct {
-	Choices []struct {
-		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"message"`
-		FinishReason string `json:"finish_reason"`
-	} `json:"choices"`
-	Usage struct {
+	Choices []chatResponseChoice `json:"choices"`
+	Usage   struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 		TotalTokens      int `json:"total_tokens"`
@@ -72,16 +74,110 @@ type streamChunk struct {
 	} `json:"choices"`
 }
 
-// whisperResponse Whisper 转写响应
-type whisperResponse struct {
-	Text string `json:"text"`
+// anthropicRequest Anthropic Messages 请求体。
+// Anthropic 将 system 提示词放在顶层，其余消息只允许 user / assistant。
+type anthropicRequest struct {
+	Model       string        `json:"model"`
+	System      string        `json:"system,omitempty"`
+	Messages    []ChatMessage `json:"messages"`
+	Temperature float64       `json:"temperature,omitempty"`
+	MaxTokens   int           `json:"max_tokens"`
+	Stream      bool          `json:"stream,omitempty"`
 }
 
-// ttsRequest TTS 请求体
-type ttsRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
-	Voice string `json:"voice"`
+type anthropicResponse struct {
+	Type    string `json:"type"`
+	Role    string `json:"role"`
+	Model   string `json:"model"`
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+	StopReason string `json:"stop_reason"`
+	Usage      struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
+}
+
+type anthropicStreamEvent struct {
+	Type  string `json:"type"`
+	Delta struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"delta"`
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// === MiMo ASR (mimo-v2.5-asr) 请求/响应类型 ===
+// mimo ASR 不走 /v1/audio/transcriptions，而是通过 /v1/chat/completions
+// 用 input_audio 类型的 content 传入 base64 编码的音频
+
+// asrInputAudio ASR 输入音频
+type asrInputAudio struct {
+	Data string `json:"data"` // "data:{MIME};base64,{BASE64_AUDIO}"
+}
+
+// asrContentItem ASR 消息 content 数组项
+type asrContentItem struct {
+	Type       string        `json:"type"` // "input_audio"
+	InputAudio asrInputAudio `json:"input_audio"`
+}
+
+// asrMessage ASR 请求消息（content 是数组而非字符串）
+type asrMessage struct {
+	Role    string           `json:"role"` // "user"
+	Content []asrContentItem `json:"content"`
+}
+
+// asrRequest mimo-v2.5-asr 请求体
+type asrRequest struct {
+	Model      string       `json:"model"`
+	Messages   []asrMessage `json:"messages"`
+	ASROptions struct {
+		Language string `json:"language"` // auto / zh / en
+	} `json:"asr_options"`
+}
+
+// === MiMo TTS (mimo-v2.5-tts) 请求/响应类型 ===
+// mimo TTS 不走 /v1/audio/speech，而是通过 /v1/chat/completions
+// 目标文本放在 role=assistant 的 content 中，audio 参数指定格式和音色
+
+// ttsMessage TTS 请求消息
+type ttsMessage struct {
+	Role    string `json:"role"`    // "assistant"
+	Content string `json:"content"` // 要合成的文本
+}
+
+// ttsAudioConfig TTS 音频配置
+type ttsAudioConfig struct {
+	Format string `json:"format"` // "wav" / "pcm16"
+	Voice  string `json:"voice"`  // "Chloe" / "冰糖" 等预置音色
+}
+
+// ttsRequestMimo mimo-v2.5-tts 请求体
+type ttsRequestMimo struct {
+	Model    string         `json:"model"`
+	Messages []ttsMessage   `json:"messages"`
+	Audio    ttsAudioConfig `json:"audio"`
+}
+
+// ttsResponseMimo TTS 响应（响应中 message.audio.data 是 base64 编码的音频）
+type ttsResponseMimo struct {
+	Choices []struct {
+		Message struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+			Audio   struct {
+				ID   string `json:"id"`
+				Data string `json:"data"` // base64 编码的音频字节
+			} `json:"audio"`
+		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
 }
 
 // LLM 错误
@@ -111,6 +207,9 @@ func (s *LLMService) IsConfigured() bool {
 }
 
 // Chat 非流式对话，返回完整文本
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（提问生成、评分、复盘报告等所有非流式 LLM 调用）
 func (s *LLMService) Chat(ctx context.Context, messages []ChatMessage) (string, error) {
 	if !s.IsConfigured() {
 		return "", ErrLLMNotConfigured
@@ -135,6 +234,9 @@ func (s *LLMService) Chat(ctx context.Context, messages []ChatMessage) (string, 
 
 // ChatStream 流式对话，通过 onDelta 回调逐 token 推送
 // 调用方负责在 HTTP handler 中设置 SSE 头并写入响应流
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（AI 面试官流式提问）
 func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onDelta func(delta string)) error {
 	if !s.IsConfigured() {
 		return ErrLLMNotConfigured
@@ -146,6 +248,10 @@ func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onD
 		Temperature: s.cfg.Temperature,
 		MaxTokens:   s.cfg.MaxTokens,
 		Stream:      true,
+	}
+
+	if s.isAnthropic() {
+		return s.chatStreamAnthropic(ctx, reqBody, onDelta)
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -201,6 +307,9 @@ func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onD
 
 // ChatJSON 对话并要求返回 JSON，自动解析到 out
 // out 必须是指针。prompt 中应明确要求 JSON 格式与字段。
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（评分、复盘报告等结构化输出）
 func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out interface{}) error {
 	if !s.IsConfigured() {
 		return ErrLLMNotConfigured
@@ -236,101 +345,12 @@ func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out i
 	return nil
 }
 
-// Transcribe 调用 Whisper 将音频转写为文本
-// audio 为音频文件内容（MP3/WAV/M4A 等），filename 用于 multipart 文件名
-func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename string) (string, error) {
-	if !s.IsConfigured() {
-		return "", ErrLLMNotConfigured
-	}
-
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	// 音频文件字段
-	part, err := writer.CreateFormFile("file", filename)
-	if err != nil {
-		return "", fmt.Errorf("create form file: %w", err)
-	}
-	if _, err := io.Copy(part, audio); err != nil {
-		return "", fmt.Errorf("copy audio: %w", err)
-	}
-	// model 字段
-	if err := writer.WriteField("model", s.cfg.WhisperModel); err != nil {
-		return "", fmt.Errorf("write model field: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("close multipart writer: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.BaseURL+"/audio/transcriptions", &buf)
-	if err != nil {
-		return "", fmt.Errorf("new request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", s.wrapAPIError(resp)
-	}
-
-	var result whisperResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode whisper response: %w", err)
-	}
-	return strings.TrimSpace(result.Text), nil
-}
-
-// Synthesize 调用 TTS 将文本合成为 MP3 音频字节
-func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error) {
-	if !s.IsConfigured() {
-		return nil, ErrLLMNotConfigured
-	}
-	if text == "" {
-		return nil, errors.New("tts input text is empty")
-	}
-
-	reqBody := ttsRequest{
-		Model: s.cfg.TTSModel,
-		Input: text,
-		Voice: s.cfg.TTSVoice,
-	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.BaseURL+"/audio/speech", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("new request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, s.wrapAPIError(resp)
-	}
-
-	audio, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read tts audio: %w", err)
-	}
-	return audio, nil
-}
-
 // doChat 执行非流式 Chat 请求
 func (s *LLMService) doChat(ctx context.Context, reqBody chatRequest) (*chatResponse, error) {
+	if s.isAnthropic() {
+		return s.doChatAnthropic(ctx, reqBody)
+	}
+
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)

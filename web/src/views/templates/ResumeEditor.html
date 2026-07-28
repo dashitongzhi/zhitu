@@ -1,0 +1,521 @@
+  <div class="resume-shell" :class="{ 'has-preview-sidebar': demoMode }">
+    <aside v-if="demoMode" class="product-sidebar" aria-label="产品导航">
+      <button class="sidebar-brand" type="button" @click="router.push('/')">
+        <span class="sidebar-logo">职</span>
+        <span><strong>职途</strong><small>智能求职工作台</small></span>
+      </button>
+      <nav class="product-nav">
+        <button class="active" type="button" aria-current="page">
+          <FileTextOutlined />
+          <span><strong>简历实验室</strong><small>编辑与实时预览</small></span>
+        </button>
+        <button type="button" @click="previewNavigate('interview')">
+          <CommentOutlined />
+          <span><strong>面试训练场</strong><small>模拟面试与复盘</small></span>
+        </button>
+        <button type="button" @click="previewNavigate('delivery')">
+          <SendOutlined />
+          <span><strong>投递看板</strong><small>跟踪求职进度</small></span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="status-dot" />
+        本地设计预览
+      </div>
+    </aside>
+
+    <div class="resume-lab" :class="{ 'is-demo': demoMode }">
+    <header class="lab-toolbar">
+      <div class="toolbar-leading">
+        <button class="icon-button" type="button" aria-label="返回简历列表" @click="backToList">
+          <ArrowLeftOutlined />
+        </button>
+        <div class="brand-mark"><span>职</span></div>
+        <div class="resume-title-wrap">
+          <input v-model="editableName" class="resume-name" @blur="handleNameSave" />
+          <span class="save-state"><CheckCircleOutlined /> {{ demoMode ? '本地预览模式' : '内容实时预览' }}</span>
+        </div>
+      </div>
+
+      <div class="toolbar-controls">
+        <label class="toolbar-select">
+          <LayoutOutlined />
+          <select v-model="templateStyle">
+            <option v-for="template in resumeTemplates" :key="template.id" :value="template.id">
+              {{ template.name }}
+            </option>
+          </select>
+        </label>
+        <label class="toolbar-select">
+          <FontSizeOutlined />
+          <select v-model="fontFamily">
+            <option value="serif">宋体正文</option>
+            <option value="sans">黑体正文</option>
+          </select>
+        </label>
+        <label class="toolbar-select compact">
+          <ColumnHeightOutlined />
+          <select v-model="density">
+            <option value="compact">紧凑</option>
+            <option value="comfortable">舒展</option>
+          </select>
+        </label>
+        <div class="zoom-control">
+          <button type="button" @click="zoom = Math.max(60, zoom - 5)">−</button>
+          <span>{{ zoom }}%</span>
+          <button type="button" @click="zoom = Math.min(110, zoom + 5)">＋</button>
+        </div>
+        <a-button @click="versionDrawerOpen = true"><HistoryOutlined /> 版本</a-button>
+        <a-button @click="showSaveVersionModal = true"><SaveOutlined /> 保存版本</a-button>
+        <a-button class="export-button" type="primary" @click="exportResume">
+          <DownloadOutlined /> 导出 PDF
+        </a-button>
+      </div>
+    </header>
+
+    <main class="lab-workspace">
+      <aside class="editor-panel">
+        <div class="panel-tabs">
+          <button
+            type="button"
+            :class="{ active: editorTab === 'edit' }"
+            @click="editorTab = 'edit'"
+          >结构化编辑</button>
+          <button
+            type="button"
+            :class="{ active: editorTab === 'smart' }"
+            @click="editorTab = 'smart'"
+          >
+            <BulbOutlined /> 智能完善
+          </button>
+        </div>
+
+        <!-- 结构化编辑 -->
+        <div v-if="editorTab === 'edit'" class="editor-scroll">
+          <div class="panel-hint">填写内容后，右侧 A4 简历会即时更新</div>
+
+          <section class="form-section" :class="{ collapsed: collapsed.personal }">
+            <div class="section-heading" :class="{ disabled: !isVisible('personal') }">
+              <label class="visibility-toggle" title="控制基本信息是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.personal" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <UserOutlined /><strong>基本信息</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起基本信息" @click="toggleSection('personal')"><DownOutlined /></button>
+            </div>
+            <div class="section-body grid-two">
+              <label class="field full"><span>姓名</span><input v-model="resumeContent.personal.name" /></label>
+              <label class="field"><span>电话</span><input v-model="resumeContent.personal.phone" /></label>
+              <label class="field"><span>邮箱</span><input v-model="resumeContent.personal.email" /></label>
+              <label class="field"><span>所在城市</span><input v-model="resumeContent.personal.city" /></label>
+              <label class="field"><span>GitHub / 主页</span><input v-model="resumeContent.personal.github" /></label>
+            </div>
+          </section>
+
+          <section class="form-section" :class="{ collapsed: collapsed.intention }">
+            <div class="section-heading" :class="{ disabled: !isVisible('intention') }">
+              <label class="visibility-toggle" title="控制求职意向是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.intention" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <AimOutlined /><strong>求职意向</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起求职意向" @click="toggleSection('intention')"><DownOutlined /></button>
+            </div>
+            <div class="section-body grid-two">
+              <label class="field full"><span>目标岗位</span><input v-model="resumeContent.intention.position" /></label>
+              <label class="field"><span>期望城市</span><input v-model="resumeContent.intention.city" /></label>
+              <label class="field"><span>期望薪资</span><input v-model="resumeContent.intention.salary" /></label>
+              <label class="field"><span>到岗时间</span><input v-model="resumeContent.intention.arrival" /></label>
+              <label class="field"><span>目标行业</span><input v-model="resumeContent.intention.industry" /></label>
+            </div>
+          </section>
+
+          <section class="form-section" :class="{ collapsed: collapsed.education }">
+            <div class="section-heading" :class="{ disabled: !isVisible('education') }">
+              <label class="visibility-toggle" title="控制教育经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.education" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ReadOutlined /><strong>教育经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起教育经历" @click="toggleSection('education')"><DownOutlined /></button>
+            </div>
+            <div class="section-body repeat-list">
+              <article v-for="(item, index) in resumeContent.education" :key="`edu-${index}`" class="repeat-item">
+                <button class="remove-item" type="button" @click="resumeContent.education.splice(index, 1)"><DeleteOutlined /></button>
+                <div class="grid-two">
+                  <label class="field full"><span>学校</span><input v-model="item.school" /></label>
+                  <label class="field"><span>专业</span><input v-model="item.major" /></label>
+                  <label class="field"><span>学历</span><input v-model="item.degree" /></label>
+                  <label class="field"><span>开始</span><input v-model="item.start" /></label>
+                  <label class="field"><span>结束</span><input v-model="item.end" /></label>
+                  <label class="field full"><span>主修课程 / GPA</span><input v-model="item.courses" /></label>
+                </div>
+              </article>
+              <button class="add-item" type="button" @click="addEducation"><PlusOutlined /> 添加教育经历</button>
+            </div>
+          </section>
+
+          <section class="form-section" :class="{ collapsed: collapsed.work }">
+            <div class="section-heading" :class="{ disabled: !isVisible('work') }">
+              <label class="visibility-toggle" title="控制工作经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.work" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <BankOutlined /><strong>工作经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起工作经历" @click="toggleSection('work')"><DownOutlined /></button>
+            </div>
+            <div class="section-body repeat-list">
+              <article v-for="(item, index) in resumeContent.work" :key="`work-${index}`" class="repeat-item">
+                <button class="remove-item" type="button" @click="resumeContent.work.splice(index, 1)"><DeleteOutlined /></button>
+                <div class="grid-two">
+                  <label class="field full"><span>公司</span><input v-model="item.company" /></label>
+                  <label class="field"><span>职位</span><input v-model="item.position" /></label>
+                  <label class="field"><span>时间</span><input v-model="item.start" placeholder="2023.07 - 至今" /></label>
+                  <label class="field full"><span>工作成果（每行一条）</span><textarea v-model="item.description" rows="5" /></label>
+                </div>
+              </article>
+              <button class="add-item" type="button" @click="addWork"><PlusOutlined /> 添加工作经历</button>
+            </div>
+          </section>
+
+          <section class="form-section" :class="{ collapsed: collapsed.project }">
+            <div class="section-heading" :class="{ disabled: !isVisible('project') }">
+              <label class="visibility-toggle" title="控制项目经历是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.project" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ProjectOutlined /><strong>项目经历</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起项目经历" @click="toggleSection('project')"><DownOutlined /></button>
+            </div>
+            <div class="section-body repeat-list">
+              <article v-for="(item, index) in resumeContent.project" :key="`project-${index}`" class="repeat-item">
+                <button class="remove-item" type="button" @click="resumeContent.project.splice(index, 1)"><DeleteOutlined /></button>
+                <div class="grid-two">
+                  <label class="field full"><span>项目名称</span><input v-model="item.name" /></label>
+                  <label class="field"><span>项目角色</span><input v-model="item.role" /></label>
+                  <label class="field"><span>时间</span><input v-model="item.start" placeholder="2024.01 - 2024.06" /></label>
+                  <label class="field full"><span>项目成果（每行一条）</span><textarea v-model="item.description" rows="5" /></label>
+                  <label class="field full"><span>技术栈（逗号分隔）</span><input :value="item.tech_stack.join(', ')" @input="updateTechStack(item, $event)" /></label>
+                </div>
+              </article>
+              <button class="add-item" type="button" @click="addProject"><PlusOutlined /> 添加项目经历</button>
+            </div>
+          </section>
+
+          <section class="form-section" :class="{ collapsed: collapsed.skills }">
+            <div class="section-heading" :class="{ disabled: !isVisible('skills') }">
+              <label class="visibility-toggle" title="控制专业技能是否显示在简历中">
+                <input v-model="resumeContent.module_visibility.skills" type="checkbox" />
+                <span class="custom-check"><CheckOutlined /></span>
+                <ToolOutlined /><strong>专业技能</strong>
+              </label>
+              <button class="collapse-button" type="button" aria-label="展开或收起专业技能" @click="toggleSection('skills')"><DownOutlined /></button>
+            </div>
+            <div class="section-body repeat-list">
+              <article v-for="(item, index) in resumeContent.skills" :key="`skill-${index}`" class="skill-row">
+                <input v-model="item.category" placeholder="分类" />
+                <input v-model="item.name" placeholder="技能内容" />
+                <button type="button" @click="resumeContent.skills.splice(index, 1)"><CloseOutlined /></button>
+              </article>
+              <button class="add-item" type="button" @click="addSkill"><PlusOutlined /> 添加技能分类</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- 智能完善（与结构化编辑同面板切换） -->
+        <div v-if="editorTab === 'smart'" class="editor-scroll smart-pane-wrap">
+          <!-- 智能完善子 tabs -->
+          <div class="smart-tabs">
+            <button
+              v-for="t in smartTabs"
+              :key="t.key"
+              class="smart-tab-btn"
+              :class="{ active: activeSmartTab === t.key }"
+              type="button"
+              @click="activeSmartTab = t.key"
+            >
+              <component :is="t.icon" />
+              <span>{{ t.label }}</span>
+            </button>
+          </div>
+
+          <!-- AI 大模型分析 -->
+          <div v-if="activeSmartTab === 'analysis'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">简历内容分析</span>
+              <button class="mini-btn" type="button" @click="runAnalysis" :disabled="analysisLoading">
+                <LoadingOutlined v-if="analysisLoading" />
+                <ReloadOutlined v-else />
+                {{ analysisLoading ? '分析中…' : '重新分析' }}
+              </button>
+            </div>
+
+            <div class="score-overview">
+              <div class="score-ring">
+                <svg viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#e8ece8" stroke-width="6" />
+                  <circle
+                    cx="40" cy="40" r="34" fill="none"
+                    stroke="url(#scoreGrad)" stroke-width="6"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${(analysisScore / 100) * 213.6} 213.6`"
+                    transform="rotate(-90 40 40)"
+                  />
+                  <defs>
+                    <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#087443" />
+                      <stop offset="100%" stop-color="#34c759" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div class="score-num">{{ analysisScore }}<small>/100</small></div>
+              </div>
+              <div class="score-meta">
+                <strong>{{ analysisScoreLabel }}</strong>
+                <p>{{ analysisScoreDesc }}</p>
+              </div>
+            </div>
+
+            <section class="dim-card">
+              <h4>多维度评分</h4>
+              <div v-for="d in analysisDimensions" :key="d.label" class="dim-row">
+                <span class="dim-label">{{ d.label }}</span>
+                <div class="dim-track"><i :style="{ width: `${d.value}%`, background: d.color }" /></div>
+                <b :style="{ color: d.color }">{{ d.value }}</b>
+              </div>
+            </section>
+
+            <section class="dim-card">
+              <h4>亮点</h4>
+              <div v-if="analysisHighlights.length" class="hl-list">
+                <article v-for="(h, i) in analysisHighlights" :key="i" class="hl-item hl-good">
+                  <CheckCircleOutlined />
+                  <div><strong>{{ h.title }}</strong><p>{{ h.detail }}</p></div>
+                </article>
+              </div>
+              <a-empty v-else :image="null" description="暂无亮点" />
+            </section>
+
+            <section class="dim-card">
+              <h4>待补强项</h4>
+              <div v-if="analysisWeakness.length" class="hl-list">
+                <article v-for="(w, i) in analysisWeakness" :key="i" class="hl-item hl-bad">
+                  <ExclamationCircleOutlined />
+                  <div>
+                    <strong>{{ w.title }}</strong><p>{{ w.detail }}</p>
+                    <button v-if="w.action" class="link-btn" type="button" @click="w.action">{{ w.actionLabel || '立即完善' }}</button>
+                  </div>
+                </article>
+              </div>
+              <a-empty v-else :image="null" description="简历已经比较完善" />
+            </section>
+          </div>
+
+          <!-- JD 智能匹配 -->
+          <div v-if="activeSmartTab === 'jd'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">岗位描述匹配</span>
+              <button class="mini-btn primary" type="button" @click="runJdMatch" :disabled="jdLoading">
+                <LoadingOutlined v-if="jdLoading" />
+                <ThunderboltOutlined v-else />
+                {{ jdLoading ? '匹配中…' : '开始匹配' }}
+              </button>
+            </div>
+
+            <label class="jd-textarea-wrap">
+              <textarea
+                v-model="targetJd"
+                rows="6"
+                placeholder="粘贴目标岗位 JD（职位描述、要求、加分项），AI 会自动提取关键词并计算匹配度"
+              />
+              <span class="jd-counter">{{ targetJd.length }} 字</span>
+            </label>
+
+            <div v-if="jdMatchResult" class="jd-result">
+              <div class="jd-match-ring">
+                <svg viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#e8ece8" stroke-width="8" />
+                  <circle
+                    cx="50" cy="50" r="42" fill="none"
+                    :stroke="jdMatchColor" stroke-width="8"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${(jdMatchResult.matchRate / 100) * 263.9} 263.9`"
+                    transform="rotate(-90 50 50)"
+                  />
+                </svg>
+                <div class="jd-match-num">
+                  <strong>{{ jdMatchResult.matchRate }}%</strong>
+                  <small>{{ jdMatchLabel }}</small>
+                </div>
+              </div>
+
+              <div class="jd-stats">
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num green">{{ jdMatchResult.matched.length }}</span>
+                  <span class="jd-stat-label">已匹配关键词</span>
+                </div>
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num red">{{ jdMatchResult.missing.length }}</span>
+                  <span class="jd-stat-label">缺失关键词</span>
+                </div>
+                <div class="jd-stat-item">
+                  <span class="jd-stat-num blue">{{ jdMatchResult.suggest.length }}</span>
+                  <span class="jd-stat-label">建议补充</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>已匹配 <small>简历中已包含</small></h5>
+                <div class="kw-tags">
+                  <span v-for="k in jdMatchResult.matched" :key="k" class="kw-tag kw-green">{{ k }}</span>
+                  <span v-if="!jdMatchResult.matched.length" class="kw-empty">暂无</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>缺失关键词 <small>JD 中出现但简历未提及</small></h5>
+                <div class="kw-tags">
+                  <span v-for="k in jdMatchResult.missing" :key="k" class="kw-tag kw-red">{{ k }}</span>
+                  <span v-if="!jdMatchResult.missing.length" class="kw-empty">无缺失</span>
+                </div>
+              </div>
+
+              <div class="kw-section">
+                <h5>AI 建议 <small>基于差距分析</small></h5>
+                <article v-for="(s, i) in jdMatchResult.suggest" :key="i" class="suggest-item">
+                  <b>{{ i + 1 }}</b>
+                  <div><strong>{{ s.title }}</strong><p>{{ s.detail }}</p></div>
+                </article>
+                <a-empty v-if="!jdMatchResult.suggest.length" :image="null" description="匹配良好，无补充建议" />
+              </div>
+            </div>
+
+            <div v-else class="jd-empty">
+              <FileSearchOutlined />
+              <p>粘贴 JD 后点击「开始匹配」</p>
+            </div>
+          </div>
+
+          <!-- AI 一键优化 -->
+          <div v-if="activeSmartTab === 'optimize'" class="smart-pane">
+            <div class="pane-head">
+              <span class="pane-title">AI 内容优化</span>
+            </div>
+
+            <div class="opt-section">
+              <h4>批量优化</h4>
+              <p class="opt-desc">点击下方按钮，AI 会根据内容自动强化措辞、补充量化指标、提升专业度</p>
+              <div class="opt-actions">
+                <button class="opt-btn" type="button" @click="optimizeAll" :disabled="optimizeLoading">
+                  <LoadingOutlined v-if="optimizeLoading" />
+                  <ThunderboltOutlined v-else />
+                  {{ optimizeLoading ? 'AI 优化中…' : '一键优化全部内容' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="opt-section">
+              <h4>逐项优化</h4>
+              <article v-for="item in optimizeItems" :key="item.key" class="opt-item">
+                <div class="opt-item-head">
+                  <strong>{{ item.title }}</strong>
+                  <span class="opt-item-status" :class="item.statusClass">{{ item.statusText }}</span>
+                </div>
+                <p class="opt-item-desc">{{ item.desc }}</p>
+                <button class="link-btn" type="button" @click="item.run" :disabled="item.loading">
+                  <LoadingOutlined v-if="item.loading" />
+                  {{ item.loading ? '处理中…' : item.buttonText }}
+                </button>
+              </article>
+            </div>
+          </div>
+
+          <p class="privacy-note"><SafetyCertificateOutlined /> 简历内容仅用于当前编辑与诊断，不会上传至第三方</p>
+        </div>
+      </aside>
+
+      <section class="preview-stage">
+        <div class="stage-meta">
+          <span><FileTextOutlined /> A4 · 实时预览</span>
+          <span>{{ contentStats.chars }} 字符 · {{ contentStats.sections }} 个内容模块</span>
+        </div>
+        <div class="paper-viewport">
+          <article
+            id="resume-paper"
+            class="resume-paper"
+            :class="[`template-${templateStyle}`, `font-${fontFamily}`, `density-${density}`]"
+            :style="{ zoom: zoom / 100 }"
+          >
+            <header v-if="isVisible('personal')" class="paper-header">
+              <h1>{{ resumeContent.personal.name || '你的姓名' }}</h1>
+              <p class="paper-role">{{ resumeContent.intention.position || '目标职位' }}</p>
+              <div class="contact-line">
+                <span v-if="resumeContent.personal.phone">{{ resumeContent.personal.phone }}</span>
+                <span v-if="resumeContent.personal.email">{{ resumeContent.personal.email }}</span>
+                <span v-if="resumeContent.personal.city">{{ resumeContent.personal.city }}</span>
+                <span v-if="resumeContent.personal.github">{{ resumeContent.personal.github }}</span>
+              </div>
+            </header>
+
+            <section v-if="isVisible('intention')" class="paper-section intention-section">
+              <h2>求职意向</h2>
+              <p>{{ intentionSummary }}</p>
+            </section>
+
+            <section v-if="isVisible('education') && resumeContent.education.length" class="paper-section">
+              <h2>教育经历</h2>
+              <article v-for="(item, index) in resumeContent.education" :key="`preview-edu-${index}`" class="resume-entry">
+                <div class="entry-heading">
+                  <strong>{{ item.school || '学校名称' }}</strong>
+                  <span>{{ item.start }}<template v-if="item.end"> — {{ item.end }}</template></span>
+                </div>
+                <div class="entry-subheading"><span>{{ item.major }}</span><span>{{ item.degree }}</span></div>
+                <p v-if="item.courses" class="entry-note">{{ item.courses }}</p>
+              </article>
+            </section>
+
+            <section v-if="isVisible('work') && resumeContent.work.length" class="paper-section">
+              <h2>工作经历</h2>
+              <article v-for="(item, index) in resumeContent.work" :key="`preview-work-${index}`" class="resume-entry">
+                <div class="entry-heading"><strong>{{ item.company || '公司名称' }}</strong><span>{{ item.start }}<template v-if="item.end"> — {{ item.end }}</template></span></div>
+                <div class="entry-subheading"><span>{{ item.position }}</span></div>
+                <ul><li v-for="(line, lineIndex) in toLines(item.description)" :key="lineIndex">{{ line }}</li></ul>
+              </article>
+            </section>
+
+            <section v-if="isVisible('project') && resumeContent.project.length" class="paper-section">
+              <h2>项目经历</h2>
+              <article v-for="(item, index) in resumeContent.project" :key="`preview-project-${index}`" class="resume-entry">
+                <div class="entry-heading"><strong>{{ item.name || '项目名称' }}</strong><span>{{ item.start }}<template v-if="item.end"> — {{ item.end }}</template></span></div>
+                <div class="entry-subheading"><span>{{ item.role }}</span><span class="tech-stack">{{ item.tech_stack.join(' · ') }}</span></div>
+                <ul><li v-for="(line, lineIndex) in toLines(item.description)" :key="lineIndex">{{ line }}</li></ul>
+              </article>
+            </section>
+
+            <section v-if="isVisible('skills') && resumeContent.skills.length" class="paper-section skill-section">
+              <h2>专业技能</h2>
+              <p v-for="(item, index) in resumeContent.skills" :key="`preview-skill-${index}`"><strong>{{ item.category }}：</strong>{{ item.name }}</p>
+            </section>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <a-drawer v-model:open="versionDrawerOpen" title="版本历史" width="380">
+      <a-empty v-if="!resumeStore.versions.length" description="暂无已保存版本" />
+      <div v-else class="version-list">
+        <button v-for="version in resumeStore.versions" :key="version.id" type="button" :class="{ active: resumeStore.currentVersion?.id === version.id }" @click="selectVersion(version)">
+          <span><strong>{{ version.version_label }}</strong><small>{{ formatVersionDate(version.created_at) }}</small></span>
+          <em>{{ version.change_note || '无版本备注' }}</em>
+        </button>
+      </div>
+    </a-drawer>
+
+    <a-modal v-model:open="showSaveVersionModal" title="保存当前版本" :confirm-loading="savingVersion" @ok="handleSaveVersion">
+      <a-form layout="vertical">
+        <a-form-item label="版本备注" required><a-input v-model:value="newVersionNote" placeholder="例如：针对后端工程师 JD 完成优化" /></a-form-item>
+        <a-alert message="当前结构化内容会保存为一个新的简历版本" type="info" show-icon />
+      </a-form>
+    </a-modal>
+    </div>
+  </div>

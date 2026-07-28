@@ -29,8 +29,8 @@ type ServerConfig struct {
 
 // DatabaseConfig 数据库相关配置
 type DatabaseConfig struct {
-	Path      string `yaml:"path"`
-	LogLevel  string `yaml:"log_level"`
+	Path     string `yaml:"path"`
+	LogLevel string `yaml:"log_level"`
 }
 
 // JWTConfig JWT 相关配置
@@ -47,15 +47,22 @@ type AdminConfig struct {
 	Password string `yaml:"password"`
 }
 
-// LLMConfig OpenAI 兼容 LLM 接口配置
+// LLMConfig LLM 接口配置
+//
+// 面试功能（InterviewRoom）模型选型约定：
+//   - ChatModel      → "mimo-v2.5-pro"   文字分析（面试提问、评分、复盘报告）
+//   - WhisperModel   → "mimo-v2.5-asr"   语音识别（用户语音回答转文字）
+//   - TTSModel       → "mimo-v2.5-tts"   语音生成（AI 面试官朗读，用户可选开关）
+//
+// 部署时在 config.yaml 中把三者改为上述 mimo 模型即可对接 mimo 服务。
 type LLMConfig struct {
-	Provider     string  `yaml:"provider"` // 标识用，便于日志/调试（如 openai/deepseek/mimo）
+	Provider     string  `yaml:"provider"` // openai / anthropic / mimo
 	BaseURL      string  `yaml:"base_url"`
 	APIKey       string  `yaml:"api_key"`
-	ChatModel    string  `yaml:"chat_model"`
-	WhisperModel string  `yaml:"whisper_model"`
-	TTSModel     string  `yaml:"tts_model"`
-	TTSVoice     string  `yaml:"tts_voice"`
+	ChatModel    string  `yaml:"chat_model"`    // 文字分析模型，推荐 mimo-v2.5-pro
+	WhisperModel string  `yaml:"whisper_model"` // 语音识别 (ASR) 模型，推荐 mimo-v2.5-asr
+	TTSModel     string  `yaml:"tts_model"`     // 语音生成 (TTS) 模型，推荐 mimo-v2.5-tts（用户可选）
+	TTSVoice     string  `yaml:"tts_voice"`     // TTS 音色
 	Temperature  float64 `yaml:"temperature"`
 	MaxTokens    int     `yaml:"max_tokens"`
 	TimeoutSec   int     `yaml:"timeout_sec"`
@@ -151,6 +158,9 @@ func (c *Config) applyDefaults() error {
 		c.Admin.Password = "admin123456"
 	}
 	// LLM 默认值
+	if c.LLM.Provider == "" {
+		c.LLM.Provider = "openai"
+	}
 	if c.LLM.BaseURL == "" {
 		c.LLM.BaseURL = "https://api.openai.com/v1"
 	}

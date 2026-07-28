@@ -1,0 +1,120 @@
+  <a-layout class="app-layout unified-layout">
+    <!-- 侧边栏 -->
+    <a-layout-sider
+      v-model:collapsed="collapsed"
+      collapsible
+      :width="224"
+      :collapsed-width="76"
+      :trigger="null"
+      class="app-sider"
+      theme="light"
+    >
+      <!-- Logo 区域 -->
+      <div class="logo">
+        <span class="logo-icon unified-brand-mark" aria-hidden="true">职</span>
+        <span v-show="!collapsed" class="logo-text">职途</span>
+      </div>
+
+      <!-- 导航菜单 -->
+      <a-menu
+        v-model:selectedKeys="selectedKeys"
+        v-model:openKeys="openKeys"
+        mode="inline"
+        :style="{ borderRight: 0 }"
+      >
+        <a-menu-item key="resumes" @click="navigateTo('/app/resumes')">
+          <template #icon>
+            <FileTextOutlined />
+          </template>
+          <span>简历实验室</span>
+        </a-menu-item>
+
+        <a-menu-item key="interviews" @click="navigateTo('/app/interviews')">
+          <template #icon>
+            <CommentOutlined />
+          </template>
+          <span>面试训练场</span>
+        </a-menu-item>
+
+        <a-menu-item key="deliveries" @click="navigateTo('/app/deliveries')">
+          <template #icon>
+            <SendOutlined />
+          </template>
+          <span>投递看板</span>
+        </a-menu-item>
+      </a-menu>
+
+      <!-- 自定义折叠按钮（仿菜单项样式） -->
+      <div class="sider-footer">
+        <button class="collapse-btn" @click="collapsed = !collapsed" :title="collapsed ? '展开侧边栏' : '折叠侧边栏'">
+          <MenuFoldOutlined v-if="!collapsed" />
+          <MenuUnfoldOutlined v-else />
+          <span v-show="!collapsed" class="collapse-text">折叠菜单</span>
+        </button>
+        <p class="sider-copyright" title="职途 © 2026 - 让求职更简单">
+          <span v-if="collapsed">职途</span>
+          <span v-else>职途 © 2026 - 让求职更简单</span>
+        </p>
+      </div>
+    </a-layout-sider>
+
+    <!-- 右侧布局 -->
+    <a-layout class="main-layout">
+      <!-- 顶部导航栏 -->
+      <a-layout-header class="app-header">
+        <div class="header-left">
+          <a-breadcrumb>
+            <a-breadcrumb-item>
+              <router-link to="/app/resumes">职途</router-link>
+            </a-breadcrumb-item>
+            <a-breadcrumb-item>
+              {{ currentRouteTitle }}
+            </a-breadcrumb-item>
+          </a-breadcrumb>
+        </div>
+
+        <div class="header-right">
+          <!-- 用户信息下拉菜单 -->
+          <a-dropdown overlay-class-name="user-dropdown-overlay">
+            <div class="user-info">
+              <a-avatar :size="32" class="avatar">
+                {{ userInitial }}
+              </a-avatar>
+              <span class="user-name">{{ authStore.user?.nickname || '用户' }}</span>
+              <DownOutlined class="arrow-icon" />
+            </div>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="profile" @click="showProfileModal = true">
+                  <UserOutlined />
+                  <span class="ml-2">个人资料</span>
+                </a-menu-item>
+                <a-menu-item key="password" @click="navigateTo('/app/settings/password')">
+                  <LockOutlined />
+                  <span class="ml-2">修改密码</span>
+                </a-menu-item>
+                <a-menu-divider />
+                <a-menu-item key="logout" @click="handleLogout">
+                  <LogoutOutlined />
+                  <span class="ml-2">退出登录</span>
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+        </div>
+      </a-layout-header>
+
+      <!-- 内容区域 -->
+      <a-layout-content class="app-content" :class="{ 'editor-content': currentRouteName === 'ResumeEditor', 'kanban-content': currentRouteName === 'DeliveryKanban' }">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </a-layout-content>
+
+    </a-layout>
+
+    <!-- 个人资料弹窗 -->
+    <UserProfileModal v-model:open="showProfileModal" />
+  </a-layout>

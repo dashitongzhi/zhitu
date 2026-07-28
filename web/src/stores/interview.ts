@@ -6,6 +6,7 @@ import type {
   InterviewReport,
   InterviewScore,
   CreateInterviewRequest,
+  AttachResumeRequest,
 } from '@/types/models'
 import * as interviewApi from '@/api/interview'
 import { message } from 'ant-design-vue'
@@ -65,6 +66,22 @@ export const useInterviewStore = defineStore('interview', () => {
       return i || null
     } catch (error) {
       console.error('创建面试失败:', error)
+      return null
+    }
+  }
+
+  // 在面试中发送简历（绑定简历版本快照，AI 后续提问会结合简历内容）
+  const attachResume = async (interviewId: number, data: AttachResumeRequest) => {
+    try {
+      const response = await interviewApi.attachResume(interviewId, data)
+      const updated = response.data.data
+      if (updated && currentInterview.value?.id === interviewId) {
+        currentInterview.value = updated
+      }
+      message.success('简历已发送')
+      return updated || null
+    } catch (error) {
+      console.error('发送简历失败:', error)
       return null
     }
   }
@@ -143,6 +160,7 @@ export const useInterviewStore = defineStore('interview', () => {
   ) => {
     sending.value = true
     streamingText.value = ''
+    let succeeded = false
     // 乐观加入用户消息占位（语音转写中）
     const userMsg: InterviewMessage = {
       id: Date.now(),
@@ -174,12 +192,14 @@ export const useInterviewStore = defineStore('interview', () => {
             }
           },
           onDone: (data) => {
+            succeeded = true
             streamingText.value = ''
             if (data.message) {
               messages.value.push(data.message)
             }
           },
           onInterviewEnded: (data) => {
+            succeeded = true
             if (data.message) {
               messages.value.push(data.message)
             }
@@ -194,7 +214,14 @@ export const useInterviewStore = defineStore('interview', () => {
         },
         signal
       )
-      return true
+      if (succeeded) {
+        // 用服务端保存的转写内容替换本地占位，并同步面试完成状态。
+        await fetchOne(id)
+      } else {
+        const placeholderIndex = messages.value.findIndex((item) => item.id === userMsg.id)
+        if (placeholderIndex >= 0) messages.value.splice(placeholderIndex, 1)
+      }
+      return succeeded
     } catch (error) {
       console.error('发送语音失败:', error)
       return false
@@ -281,6 +308,7 @@ export const useInterviewStore = defineStore('interview', () => {
     fetchList,
     fetchOne,
     create,
+    attachResume,
     sendMessage,
     sendVoice,
     playTts,

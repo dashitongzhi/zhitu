@@ -1,0 +1,808 @@
+  <div class="dk-shell" tabindex="0" @keydown="handleKeydown">
+    <!-- ==================== Quick Capture 顶部栏 ==================== -->
+    <div class="qc-bar">
+      <div class="qc-input-wrap">
+        <ThunderboltOutlined class="qc-icon" />
+        <input
+          v-model="quickCapture"
+          class="qc-input"
+          placeholder="粘贴 JD 快速创建投递，或输入「公司 / 岗位」后回车…"
+          @keydown.enter="handleQuickCapture"
+          @paste="handlePaste"
+        />
+        <kbd class="qc-kbd">⏎</kbd>
+      </div>
+      <div class="qc-hint" v-if="quickCaptureParsed.company || quickCaptureParsed.position">
+        <span class="qc-parsed-tag" v-if="quickCaptureParsed.company">
+          <BankOutlined /> {{ quickCaptureParsed.company }}
+        </span>
+        <span class="qc-parsed-tag" v-if="quickCaptureParsed.position">
+          <SolutionOutlined /> {{ quickCaptureParsed.position }}
+        </span>
+      </div>
+    </div>
+
+    <!-- ==================== 统计卡片网格 ==================== -->
+    <div class="stat-section-title">个人数据</div>
+    <div class="stat-grid">
+      <div
+        v-for="card in statCards"
+        :key="card.key"
+        class="stat-card"
+        :class="card.accentClass"
+      >
+        <div class="stat-icon-wrap" :style="{ background: card.iconBg, color: card.iconColor }">
+          <component :is="card.icon" />
+        </div>
+        <div class="stat-body">
+          <div class="stat-number">{{ card.value }}</div>
+          <div class="stat-label">{{ card.label }}</div>
+          <div class="stat-change" :class="card.changeClass">{{ card.change }}</div>
+        </div>
+        <svg class="stat-spark" viewBox="0 0 80 24" preserveAspectRatio="none">
+          <polyline
+            :points="card.sparkline"
+            fill="none"
+            :stroke="card.sparkColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
+
+    <!-- ==================== 视图切换 + 筛选器 ==================== -->
+    <div class="section-row">
+      <div class="view-toggle-group">
+        <button
+          class="view-toggle-btn"
+          :data-active="viewMode === 'personal'"
+          @click="viewMode = 'personal'"
+        >
+          <TableOutlined /> 个人投递
+        </button>
+        <button
+          class="view-toggle-btn"
+          :data-active="viewMode === 'platform'"
+          @click="viewMode = 'platform'"
+        >
+          <PieChartOutlined /> 平台数据
+        </button>
+      </div>
+
+      <div v-if="viewMode !== 'platform'" class="search-wrap">
+        <SearchOutlined class="search-icon" />
+        <input
+          v-model="searchKeyword"
+          class="search-input"
+          placeholder="搜索公司、岗位…"
+        />
+      </div>
+
+      <div v-if="viewMode !== 'platform'" class="filter-cluster">
+        <select class="filter-select" v-model="filters.status" @change="handleFilter">
+          <option value="">全部状态</option>
+          <option v-for="s in statusList" :key="s.value" :value="s.value">{{ s.label }}</option>
+        </select>
+        <select class="filter-select" v-model="filters.priority" @change="handleFilter">
+          <option value="">全部优先级</option>
+          <option value="high">高</option>
+          <option value="medium">中</option>
+          <option value="low">低</option>
+        </select>
+        <select class="filter-select" v-model="filters.channel" @change="handleFilter">
+          <option value="">全部渠道</option>
+          <option v-for="c in channelOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
+        </select>
+        <button class="btn-primary-capsule" @click="showCreateModal">
+          <PlusOutlined /> 新增投递
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== 主体：数据区 + 详情面板 ==================== -->
+    <div
+      class="content-flex"
+      :class="{ 'platform-mode': viewMode === 'platform' }"
+      v-if="filteredDeliveries.length > 0 || hasActiveFilter || viewMode === 'platform'"
+    >
+      <div class="content-main">
+        <!-- 空状态 -->
+        <div v-if="filteredDeliveries.length === 0 && viewMode !== 'platform'" class="empty-state">
+          <div class="empty-illustration">
+            <InboxOutlined />
+          </div>
+          <div class="empty-title">没有匹配的投递记录</div>
+          <div class="empty-desc">尝试调整筛选条件，或清空所有筛选查看全部记录</div>
+          <button class="btn-secondary-capsule" @click="clearFilters">清空筛选</button>
+        </div>
+
+        <!-- 视图切换动画包装 -->
+        <Transition name="view-fade" mode="out-in">
+          <!-- ===== 个人投递视图（表格 + 移动端卡片） ===== -->
+          <div v-if="viewMode === 'personal' && filteredDeliveries.length > 0" key="personal" class="view-wrap">
+            <!-- 桌面/平板表格 -->
+            <div class="kb-table-card kb-table-desktop">
+              <div class="kb-table-scroll">
+                <table class="kb-table">
+                  <thead>
+                    <tr>
+                      <th>公司</th>
+                      <th>岗位</th>
+                      <th>渠道</th>
+                      <th>投递日期</th>
+                      <th>状态</th>
+                      <th>面试进度</th>
+                      <th>下次面试</th>
+                      <th>HR 最新反馈</th>
+                      <th>优先级</th>
+                      <th style="text-align: right;">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(item, idx) in filteredDeliveries"
+                      :key="item.id"
+                      :class="{ selected: selectedId === item.id }"
+                      :data-idx="idx"
+                      @click="selectDelivery(item)"
+                      @mouseenter="hoveredId = item.id"
+                      @mouseleave="hoveredId = null"
+                    >
+                      <td>
+                        <div class="kb-company-cell">
+                          <span class="kb-company">{{ item.company }}</span>
+                          <span v-if="item.remark" class="kb-remark-dot" :title="item.remark">·</span>
+                        </div>
+                      </td>
+                      <td>{{ item.position }}</td>
+                      <td><span class="kb-channel" :class="getChannelClass(item.channel)">{{ getChannelLabel(item.channel) }}</span></td>
+                      <td class="mono">{{ formatDate(item.apply_date) }}</td>
+                      <td>
+                        <span class="kb-status" :class="getStatusClass(item.status)">
+                          <span class="status-dot" :style="{ background: getStatusColor(item.status) }"></span>
+                          {{ getStatusText(item.status) }}
+                        </span>
+                      </td>
+                      <td>
+                        <div class="kb-dots" :title="getProgressTooltip(item)">
+                          <span
+                            v-for="(d, i) in getProgressDots(item)"
+                            :key="i"
+                            class="dot"
+                            :class="d"
+                          ></span>
+                        </div>
+                      </td>
+                      <td>
+                        <span v-if="getNextInterview(item)" class="kb-next-interview">
+                          <CalendarOutlined />
+                          {{ formatShortDateTime(getNextInterview(item).interview_time) }}
+                        </span>
+                        <span v-else class="kb-dash">—</span>
+                      </td>
+                      <td class="kb-feedback-cell">
+                        <span v-if="getLatestFeedback(item.id)">{{ truncate(getLatestFeedback(item.id).summary, 24) }}</span>
+                        <span v-else class="kb-dash">—</span>
+                      </td>
+                      <td><span class="kb-priority" :class="getPriorityClass(item.priority)">{{ getPriorityText(item.priority) }}</span></td>
+                      <td style="text-align: right; white-space: nowrap;" @click.stop>
+                        <button class="kb-action" @click="selectDelivery(item)" title="查看详情">
+                          <RightOutlined />
+                        </button>
+                        <a-dropdown :trigger="['click']">
+                          <button class="kb-action" title="更多操作"><EllipsisOutlined /></button>
+                          <template #overlay>
+                            <a-menu>
+                              <a-menu-item
+                                v-for="s in getAvailableTransitions(item.status)"
+                                :key="s.value"
+                                @click="handleStatusChange(item, s.value)"
+                              >
+                                <RightCircleOutlined /> 转为{{ s.label }}
+                              </a-menu-item>
+                              <a-menu-divider />
+                              <a-menu-item @click="showRoundModalFor(item)"><PlusOutlined /> 添加轮次</a-menu-item>
+                              <a-menu-item @click="showFeedbackModalFor(item)"><MessageOutlined /> 添加反馈</a-menu-item>
+                              <a-menu-divider />
+                              <a-menu-item danger @click="handleDelete(item.id)"><DeleteOutlined /> 删除</a-menu-item>
+                            </a-menu>
+                          </template>
+                        </a-dropdown>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 移动端卡片堆叠 -->
+            <div class="kb-cards-mobile">
+              <div
+                v-for="item in filteredDeliveries"
+                :key="item.id"
+                class="kb-mobile-card"
+                :class="{ selected: selectedId === item.id }"
+                @click="selectDelivery(item)"
+              >
+                <div class="kb-mobile-head">
+                  <span class="kb-company">{{ item.company }}</span>
+                  <span class="kb-status" :class="getStatusClass(item.status)">
+                    <span class="status-dot" :style="{ background: getStatusColor(item.status) }"></span>
+                    {{ getStatusText(item.status) }}
+                  </span>
+                </div>
+                <div class="kb-mobile-pos">{{ item.position }}</div>
+                <div class="kb-mobile-meta">
+                  <span class="kb-channel" :class="getChannelClass(item.channel)">{{ getChannelLabel(item.channel) }}</span>
+                  <span class="mono">{{ formatDate(item.apply_date) }}</span>
+                  <span class="kb-priority" :class="getPriorityClass(item.priority)">{{ getPriorityText(item.priority) }}</span>
+                </div>
+                <div class="kb-mobile-foot" v-if="getNextInterview(item) || getLatestFeedback(item.id)">
+                  <span v-if="getNextInterview(item)" class="kb-next-interview">
+                    <CalendarOutlined /> {{ formatShortDateTime(getNextInterview(item).interview_time) }}
+                  </span>
+                  <span v-if="getLatestFeedback(item.id)" class="kb-mobile-fb">{{ getLatestFeedback(item.id).summary }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== 平台数据视图 ===== -->
+          <div v-else-if="viewMode === 'platform'" key="platform" class="platform-view">
+            <!-- 顶部核心指标 -->
+            <div class="platform-hero">
+              <div class="platform-hero-card">
+                <div class="platform-hero-icon" style="background: var(--brand-50); color: var(--primary);">
+                  <TeamOutlined />
+                </div>
+                <div>
+                  <div class="platform-hero-value">{{ platformStats.totalUsers.toLocaleString() }}</div>
+                  <div class="platform-hero-label">累计服务用户</div>
+                </div>
+              </div>
+              <div class="platform-hero-card">
+                <div class="platform-hero-icon" style="background: var(--state-success-surface); color: var(--success);">
+                  <TrophyOutlined />
+                </div>
+                <div>
+                  <div class="platform-hero-value">{{ platformStats.successRate }}%</div>
+                  <div class="platform-hero-label">综合成功率</div>
+                </div>
+              </div>
+              <div class="platform-hero-card">
+                <div class="platform-hero-icon" style="background: rgba(175,82,222,0.14); color: #8e3db5;">
+                  <SendOutlined />
+                </div>
+                <div>
+                  <div class="platform-hero-value">{{ platformStats.totalDeliveries.toLocaleString() }}</div>
+                  <div class="platform-hero-label">累计投递次数</div>
+                </div>
+              </div>
+              <div class="platform-hero-card">
+                <div class="platform-hero-icon" style="background: rgba(255,149,0,0.14); color: #c46900;">
+                  <RiseOutlined />
+                </div>
+                <div>
+                  <div class="platform-hero-value">{{ platformStats.avgCycleDays }}</div>
+                  <div class="platform-hero-label">平均求职周期（天）</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="platform-grid-2">
+              <!-- 饼图：投递结果分布 -->
+              <div class="platform-card">
+                <div class="platform-card-head">
+                  <div class="platform-card-title">
+                    <PieChartOutlined /> 投递结果分布
+                  </div>
+                  <span class="platform-card-sub">基于全平台累计数据</span>
+                </div>
+                <div class="pie-wrap">
+                  <svg class="pie-svg" viewBox="0 0 200 200">
+                    <circle
+                      v-for="(seg, i) in pieSegments"
+                      :key="i"
+                      cx="100" cy="100" r="70"
+                      :fill="seg.fill"
+                      :stroke="seg.stroke"
+                      :stroke-width="seg.strokeWidth"
+                      :stroke-dasharray="seg.dashArray"
+                      :stroke-dashoffset="seg.dashOffset"
+                      transform="rotate(-90 100 100)"
+                    />
+                    <text x="100" y="92" text-anchor="middle" class="pie-center-num">{{ platformStats.totalDeliveries.toLocaleString() }}</text>
+                    <text x="100" y="112" text-anchor="middle" class="pie-center-label">累计投递</text>
+                  </svg>
+                  <div class="pie-legend">
+                    <div v-for="(seg, i) in pieSegments" :key="i" class="pie-legend-item">
+                      <span class="pie-legend-dot" :style="{ background: seg.color }"></span>
+                      <span class="pie-legend-name">{{ seg.label }}</span>
+                      <span class="pie-legend-value">{{ seg.value.toLocaleString() }}</span>
+                      <span class="pie-legend-pct">{{ seg.pct }}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 饼图：服务行业分布 -->
+              <div class="platform-card">
+                <div class="platform-card-head">
+                  <div class="platform-card-title">
+                    <SolutionOutlined /> 服务行业分布
+                  </div>
+                  <span class="platform-card-sub">用户所在行业 Top 6</span>
+                </div>
+                <div class="pie-wrap">
+                  <svg class="pie-svg" viewBox="0 0 200 200">
+                    <circle
+                      v-for="(seg, i) in industryPieSegments"
+                      :key="i"
+                      cx="100" cy="100" r="70"
+                      :fill="seg.fill"
+                      :stroke="seg.stroke"
+                      :stroke-width="seg.strokeWidth"
+                      :stroke-dasharray="seg.dashArray"
+                      :stroke-dashoffset="seg.dashOffset"
+                      transform="rotate(-90 100 100)"
+                    />
+                    <text x="100" y="92" text-anchor="middle" class="pie-center-num">{{ platformStats.totalUsers.toLocaleString() }}</text>
+                    <text x="100" y="112" text-anchor="middle" class="pie-center-label">服务用户</text>
+                  </svg>
+                  <div class="pie-legend">
+                    <div v-for="(seg, i) in industryPieSegments" :key="i" class="pie-legend-item">
+                      <span class="pie-legend-dot" :style="{ background: seg.color }"></span>
+                      <span class="pie-legend-name">{{ seg.label }}</span>
+                      <span class="pie-legend-value">{{ seg.value.toLocaleString() }}</span>
+                      <span class="pie-legend-pct">{{ seg.pct }}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 求职转化漏斗 -->
+            <div class="platform-card">
+              <div class="platform-card-head">
+                <div class="platform-card-title">
+                  <RiseOutlined /> 求职转化漏斗
+                </div>
+                <span class="platform-card-sub">各阶段转化率（近 30 天）</span>
+              </div>
+              <div class="funnel-platform">
+                <div v-for="(stage, i) in platformFunnel" :key="i" class="funnel-platform-row">
+                  <div class="funnel-stage-label">{{ stage.label }}</div>
+                  <div class="funnel-stage-bar-wrap">
+                    <div class="funnel-stage-bar" :style="{ width: stage.pct + '%', background: stage.color }"></div>
+                  </div>
+                  <div class="funnel-stage-value">{{ stage.value.toLocaleString() }}</div>
+                  <div class="funnel-stage-pct">{{ stage.pct }}%</div>
+                  <div class="funnel-stage-conv" v-if="i > 0">
+                    <ArrowRightOutlined />
+                    {{ stage.convPct }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="platform-grid-2">
+              <!-- 热门岗位方向 -->
+              <div class="platform-card">
+                <div class="platform-card-head">
+                  <div class="platform-card-title">
+                    <StarOutlined /> 热门求职方向
+                  </div>
+                  <span class="platform-card-sub">投递量 Top 5</span>
+                </div>
+                <div class="hot-job-row" v-for="(job, i) in hotJobs" :key="i">
+                  <span class="hot-job-rank" :class="'rank-' + (i + 1)">{{ i + 1 }}</span>
+                  <span class="hot-job-name">{{ job.name }}</span>
+                  <div class="hot-job-bar-wrap">
+                    <div class="hot-job-bar" :style="{ width: job.pct + '%' }"></div>
+                  </div>
+                  <span class="hot-job-count">{{ job.count.toLocaleString() }}</span>
+                </div>
+              </div>
+
+              <!-- 渠道效果对比 -->
+              <div class="platform-card">
+                <div class="platform-card-head">
+                  <div class="platform-card-title">
+                    <ThunderboltOutlined /> 渠道效果对比
+                  </div>
+                  <span class="platform-card-sub">各渠道 Offer 率</span>
+                </div>
+                <div class="channel-cmp-row" v-for="(ch, i) in channelComparison" :key="i">
+                  <span class="channel-cmp-name">{{ ch.name }}</span>
+                  <div class="channel-cmp-bar-wrap">
+                    <div class="channel-cmp-bar" :style="{ width: ch.pct + '%', background: ch.color }"></div>
+                  </div>
+                  <span class="channel-cmp-pct">{{ ch.pct }}%</span>
+                  <span class="channel-cmp-count">{{ ch.count }} 单</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 底部说明 -->
+            <div class="platform-footer">
+              <InfoCircleOutlined />
+              <span>数据为平台模拟统计指标，仅用于展示产品功能效果</span>
+              <span class="platform-update">最后更新：{{ platformUpdated }}</span>
+            </div>
+          </div>
+        </Transition>
+      </div>
+
+      <!-- ==================== 详情面板 ==================== -->
+      <Transition name="slide-fade">
+        <aside class="detail-panel" v-if="selectedDelivery && viewMode === 'personal'" :key="selectedDelivery.id">
+          <!-- 公司头部 -->
+          <div class="dp-header">
+            <div class="dp-header-left">
+              <div class="dp-company-name">{{ selectedDelivery.company }}</div>
+              <div class="dp-company-sub">{{ selectedDelivery.position }}</div>
+            </div>
+            <button class="dp-close" @click="selectedId = null" title="关闭 (Esc)">
+              <CloseOutlined />
+            </button>
+          </div>
+
+          <div class="dp-tags">
+            <span class="kb-status" :class="getStatusClass(selectedDelivery.status)">
+              <span class="status-dot" :style="{ background: getStatusColor(selectedDelivery.status) }"></span>
+              {{ getStatusText(selectedDelivery.status) }}
+            </span>
+            <span class="kb-priority" :class="getPriorityClass(selectedDelivery.priority)">{{ getPriorityText(selectedDelivery.priority) }}优先级</span>
+            <span class="dp-channel-tag">{{ getChannelLabel(selectedDelivery.channel) }}</span>
+          </div>
+
+          <div class="dp-meta-grid">
+            <div class="dp-meta-item">
+              <CalendarOutlined />
+              <span>{{ formatDate(selectedDelivery.apply_date) }} 投递</span>
+            </div>
+            <div class="dp-meta-item" v-if="selectedDelivery.resume_version_id">
+              <FileTextOutlined />
+              <span>简历 v{{ selectedDelivery.resume_version_id }}</span>
+            </div>
+            <div class="dp-meta-item" v-if="parseHrContact(selectedDelivery.hr_contact)?.name">
+              <UserOutlined />
+              <span>{{ parseHrContact(selectedDelivery.hr_contact).name }}</span>
+            </div>
+          </div>
+
+          <!-- Offer 详情（仅 Offer 状态显示） -->
+          <div v-if="selectedDelivery.status === 'offer' && parseOfferDetail(selectedDelivery.offer_detail)" class="dp-offer-card">
+            <div class="dp-offer-title">
+              <TrophyOutlined /> Offer 详情
+            </div>
+            <div class="dp-offer-grid">
+              <div v-if="parseOfferDetail(selectedDelivery.offer_detail).salary_base" class="dp-offer-item">
+                <div class="dp-offer-label">基础薪资</div>
+                <div class="dp-offer-value">{{ parseOfferDetail(selectedDelivery.offer_detail).salary_base }}</div>
+              </div>
+              <div v-if="parseOfferDetail(selectedDelivery.offer_detail).annual_bonus" class="dp-offer-item">
+                <div class="dp-offer-label">年终奖</div>
+                <div class="dp-offer-value">{{ parseOfferDetail(selectedDelivery.offer_detail).annual_bonus }}</div>
+              </div>
+              <div v-if="parseOfferDetail(selectedDelivery.offer_detail).stock" class="dp-offer-item">
+                <div class="dp-offer-label">股票</div>
+                <div class="dp-offer-value">{{ parseOfferDetail(selectedDelivery.offer_detail).stock }}</div>
+              </div>
+              <div v-if="parseOfferDetail(selectedDelivery.offer_detail).deadline" class="dp-offer-item">
+                <div class="dp-offer-label">回复截止</div>
+                <div class="dp-offer-value">{{ parseOfferDetail(selectedDelivery.offer_detail).deadline }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 面试时间线 -->
+          <div class="dp-section-title">
+            <span>面试时间线</span>
+            <button class="dp-add-btn" @click="showRoundModal()"><PlusOutlined /> 新增</button>
+          </div>
+          <div class="tl-list">
+            <!-- 投递节点 -->
+            <div class="tl-item line-solid">
+              <div class="tl-dot gray"></div>
+              <div class="tl-content">
+                <div class="tl-title">投递简历</div>
+                <div class="tl-time">{{ formatDate(selectedDelivery.apply_date) }} · {{ getChannelLabel(selectedDelivery.channel) }}</div>
+              </div>
+            </div>
+            <!-- 轮次节点 -->
+            <div
+              v-for="(round, idx) in sortedRounds"
+              :key="round.id"
+              class="tl-item"
+              :class="getTimelineLineClass(round, idx)"
+            >
+              <div class="tl-dot" :class="getTimelineDotClass(round)"></div>
+              <div class="tl-content">
+                <div class="round-head">
+                  <span class="tl-title">{{ getRoundTypeText(round.round_type) }}</span>
+                  <a-dropdown :trigger="['click']">
+                    <button class="kb-action kb-action-sm" @click.stop><EllipsisOutlined /></button>
+                    <template #overlay>
+                      <a-menu>
+                        <a-menu-item @click="showRoundModal(round)">编辑</a-menu-item>
+                        <a-menu-item danger @click="handleDeleteRound(round.id)">删除</a-menu-item>
+                      </a-menu>
+                    </template>
+                  </a-dropdown>
+                </div>
+                <div class="tl-time">
+                  {{ round.interview_time ? formatDateTime(round.interview_time) : '时间未定' }}
+                  <span v-if="round.result" :class="getRoundResultClass(round.result)"> · {{ getRoundResultText(round.result) }}</span>
+                </div>
+                <div class="tl-meta" v-if="round.interviewer_name">
+                  <UserOutlined /> {{ round.interviewer_name }}{{ round.interviewer_title ? ' · ' + round.interviewer_title : '' }} · {{ getRoundFormatText(round.format) }}
+                </div>
+                <div class="tl-meta" v-if="round.question_summary">
+                  <FileTextOutlined /> {{ round.question_summary }}
+                </div>
+                <span class="tl-tag" v-if="round.feedback">反馈：{{ round.feedback }}</span>
+              </div>
+            </div>
+            <!-- 当前阶段提示 -->
+            <div v-if="getNextInterview(selectedDelivery)" class="tl-item current line-dashed">
+              <div class="tl-dot blue"></div>
+              <div class="tl-content">
+                <div class="tl-title">{{ getRoundTypeText(getNextInterview(selectedDelivery).round_type) }} · 待进行</div>
+                <div class="tl-time">{{ formatDateTime(getNextInterview(selectedDelivery).interview_time) }}</div>
+                <div class="tl-action-row">
+                  <button class="dp-link-btn" @click="goToInterviewTraining(selectedDelivery)">
+                    <ExportOutlined /> 去面试训练场练习
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- HR 反馈 -->
+          <div class="dp-section-title">
+            <span>HR 反馈</span>
+            <button class="dp-add-btn" @click="showFeedbackModal()"><PlusOutlined /> 新增</button>
+          </div>
+          <div v-if="feedbacks.length > 0" class="fb-list">
+            <div v-for="fb in feedbacks" :key="fb.id" class="fb-bubble">
+              <div class="fb-text">{{ fb.summary }}</div>
+              <div class="fb-meta">
+                <span><MessageOutlined /> {{ formatDateTime(fb.contact_time) }} · {{ getMethodText(fb.method) }}</span>
+                <button class="fb-del" @click="handleDeleteFeedback(fb.id)"><DeleteOutlined /></button>
+              </div>
+              <div class="fb-next" v-if="fb.next_action">
+                <ArrowRightOutlined /> {{ fb.next_action }}
+              </div>
+            </div>
+          </div>
+          <div v-else class="empty-hint">暂无 HR 反馈记录</div>
+
+          <!-- AI 策略洞察 -->
+          <div class="strategy-card">
+            <div class="strategy-title">
+              <RiseOutlined /> 求职策略洞察
+            </div>
+
+              <!-- 投递漏斗 SVG -->
+              <div class="strategy-sub">投递漏斗</div>
+              <div class="funnel-svg-wrap">
+                <svg class="funnel-svg" viewBox="0 0 280 100" preserveAspectRatio="none">
+                  <polygon
+                    v-for="(seg, i) in funnelSegments"
+                    :key="i"
+                    :points="seg.points"
+                    :fill="seg.color"
+                    :opacity="0.85"
+                  />
+                </svg>
+                <div class="funnel-labels">
+                  <div v-for="(seg, i) in funnelSegments" :key="i" class="funnel-label-item">
+                    <span class="funnel-label-name">{{ seg.label }}</span>
+                    <span class="funnel-label-val">{{ seg.value }} <span class="funnel-label-pct">({{ seg.pct }}%)</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 渠道分布 -->
+              <div class="strategy-sub">渠道分布</div>
+              <div class="bar-row" v-for="ch in channelStats" :key="ch.label">
+                <span class="bar-label">{{ ch.label }}<span class="mono">{{ ch.value }}</span></span>
+                <div class="bar-track"><div class="bar-fill" :class="ch.cls" :style="{ width: ch.pct + '%' }"></div></div>
+              </div>
+
+              <!-- 平均周期 -->
+              <div class="strategy-sub">平均周期</div>
+              <div class="cycle-stat">
+                <span class="cycle-num">{{ avgCycle }}</span>
+                <span class="cycle-unit">天 · 从投递到 Offer</span>
+              </div>
+          </div>
+        </aside>
+      </Transition>
+
+      <!-- 未选中时的占位（仅 personal 视图） -->
+      <aside class="detail-panel detail-empty" v-if="!selectedDelivery && viewMode === 'personal'">
+        <div class="detail-empty-icon">
+          <AimOutlined />
+        </div>
+        <div class="detail-empty-title">点击投递查看详情</div>
+        <div class="detail-empty-desc">选择左侧任意投递记录，查看面试时间线、HR 反馈与策略洞察</div>
+        <div class="detail-empty-shortcuts">
+          <div class="shortcut-row"><kbd>J</kbd><kbd>K</kbd> 上下导航</div>
+          <div class="shortcut-row"><kbd>N</kbd> 新增投递</div>
+          <div class="shortcut-row"><kbd>Esc</kbd> 关闭详情</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ==================== 全局空状态（无任何投递） ==================== -->
+    <div v-else class="empty-state empty-state-full">
+      <div class="empty-illustration">
+        <SendOutlined />
+      </div>
+      <div class="empty-title">开始追踪你的投递</div>
+      <div class="empty-desc">使用顶部 Quick Capture 快速创建投递，或点击「新增投递」填写完整信息</div>
+      <button class="btn-primary-capsule" @click="showCreateModal">
+        <PlusOutlined /> 新增第一条投递
+      </button>
+    </div>
+
+    <!-- ==================== 新增投递弹窗 ==================== -->
+    <a-modal
+      v-model:open="createModalVisible"
+      title="新增投递"
+      width="640px"
+      @ok="handleCreate"
+      @cancel="resetCreateForm"
+    >
+      <a-form :model="createForm" :rules="createRules" layout="vertical" ref="createFormRef">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="公司" name="company">
+              <a-input v-model:value="createForm.company" placeholder="请输入公司名称" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="职位" name="position">
+              <a-input v-model:value="createForm.position" placeholder="请输入职位名称" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item label="投递渠道" name="channel">
+              <a-select v-model:value="createForm.channel" placeholder="请选择">
+                <a-select-option v-for="c in channelOptions" :key="c.value" :value="c.value">{{ c.label }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="投递日期" name="apply_date">
+              <a-date-picker v-model:value="createForm.apply_date" placeholder="选择日期" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="优先级" name="priority">
+              <a-select v-model:value="createForm.priority" placeholder="请选择">
+                <a-select-option value="high">高</a-select-option>
+                <a-select-option value="medium">中</a-select-option>
+                <a-select-option value="low">低</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="JD 链接" name="jd_text">
+          <a-input v-model:value="createForm.jd_text" placeholder="职位 JD 链接（可选）" />
+        </a-form-item>
+        <a-form-item label="JD 内容" name="jd_content">
+          <a-textarea v-model:value="createForm.remark" placeholder="职位 JD 描述（可选，用于联动面试训练场）" :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- ==================== 轮次表单弹窗 ==================== -->
+    <a-modal
+      v-model:open="roundModalVisible"
+      :title="editingRound ? '编辑轮次' : '新增轮次'"
+      width="560px"
+      @ok="handleSaveRound"
+    >
+      <a-form :model="roundForm" layout="vertical">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="轮次类型" name="round_type">
+              <a-select v-model:value="roundForm.round_type" placeholder="请选择">
+                <a-select-option value="written_test">笔试</a-select-option>
+                <a-select-option value="first_tech">技术一面</a-select-option>
+                <a-select-option value="second_tech">技术二面</a-select-option>
+                <a-select-option value="third_tech">技术三面</a-select-option>
+                <a-select-option value="cross">交叉面</a-select-option>
+                <a-select-option value="hr">HR 面</a-select-option>
+                <a-select-option value="additional">加面</a-select-option>
+                <a-select-option value="final">终面</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="面试形式" name="format">
+              <a-select v-model:value="roundForm.format" placeholder="请选择">
+                <a-select-option value="onsite">现场</a-select-option>
+                <a-select-option value="video">视频</a-select-option>
+                <a-select-option value="phone">电话</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="面试时间" name="interview_time">
+              <a-date-picker v-model:value="roundForm.interview_time" show-time placeholder="选择时间" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="结果" name="result">
+              <a-select v-model:value="roundForm.result" placeholder="请选择">
+                <a-select-option value="pass">通过</a-select-option>
+                <a-select-option value="pending">待定</a-select-option>
+                <a-select-option value="rejected">未通过</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="面试官姓名" name="interviewer_name">
+              <a-input v-model:value="roundForm.interviewer_name" placeholder="可选" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="面试官头衔" name="interviewer_title">
+              <a-input v-model:value="roundForm.interviewer_title" placeholder="可选" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="问题摘要" name="question_summary">
+          <a-textarea v-model:value="roundForm.question_summary" :rows="2" placeholder="可选" />
+        </a-form-item>
+        <a-form-item label="反馈" name="feedback">
+          <a-textarea v-model:value="roundForm.feedback" :rows="2" placeholder="可选" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- ==================== 反馈表单弹窗 ==================== -->
+    <a-modal
+      v-model:open="feedbackModalVisible"
+      title="新增 HR 反馈"
+      width="480px"
+      @ok="handleSaveFeedback"
+    >
+      <a-form :model="feedbackForm" layout="vertical">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="联系时间" name="contact_time" required>
+              <a-date-picker v-model:value="feedbackForm.contact_time" show-time placeholder="选择时间" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="联系方式" name="method" required>
+              <a-select v-model:value="feedbackForm.method" placeholder="请选择">
+                <a-select-option value="wechat">微信</a-select-option>
+                <a-select-option value="phone">电话</a-select-option>
+                <a-select-option value="email">邮件</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="反馈摘要" name="summary" required>
+          <a-textarea v-model:value="feedbackForm.summary" :rows="3" placeholder="HR 反馈内容" />
+        </a-form-item>
+        <a-form-item label="下一步行动" name="next_action">
+          <a-textarea v-model:value="feedbackForm.next_action" :rows="2" placeholder="可选" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </div>

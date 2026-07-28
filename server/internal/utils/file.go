@@ -70,6 +70,12 @@ func IsAudioExt(name string) bool {
 	return false
 }
 
+// IsMimoASRExt 判断文件是否为 MiMo-V2.5-ASR 当前支持的音频格式。
+func IsMimoASRExt(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return ext == ".mp3" || ext == ".wav"
+}
+
 // IsResumeExt 判断是否为支持的简历文件扩展名
 func IsResumeExt(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))

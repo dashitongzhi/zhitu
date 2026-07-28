@@ -143,7 +143,9 @@ function dispatchEvent(event: SSEEvent, callbacks: SSECallbacks): void {
       if (event.content) callbacks.onDelta?.(event.content)
       break
     case 'status':
-      if (event.content) callbacks.onStatus?.(event.content)
+      if (event.content || typeof event.message === 'string') {
+        callbacks.onStatus?.(event.content || (event.message as string))
+      }
       break
     case 'done':
       callbacks.onDone?.({
@@ -158,7 +160,11 @@ function dispatchEvent(event: SSEEvent, callbacks: SSECallbacks): void {
       })
       break
     case 'error':
-      callbacks.onError?.(event.message || event.content || '未知错误')
+      callbacks.onError?.(
+        (typeof event.message === 'string' ? event.message : '') ||
+        event.content ||
+        '未知错误'
+      )
       break
   }
 }

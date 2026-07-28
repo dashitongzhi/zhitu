@@ -140,7 +140,9 @@ func New(deps Deps) *gin.Engine {
 			interviews.GET("", deps.InterviewHandler.List)
 			interviews.POST("", deps.InterviewHandler.Create)
 			interviews.GET("/:id", deps.InterviewHandler.Get)
+			interviews.POST("/:id/resume", deps.InterviewHandler.AttachResume)
 			interviews.POST("/:id/messages", deps.InterviewHandler.SendMessage)
+			interviews.POST("/:id/transcribe", deps.InterviewHandler.TranscribeVoice)
 			interviews.POST("/:id/voice", deps.InterviewHandler.SendVoice)
 			interviews.GET("/:id/tts/:msgId", deps.InterviewHandler.GetTTS)
 			interviews.POST("/:id/end", deps.InterviewHandler.End)
@@ -198,10 +200,11 @@ func healthCheck(c *gin.Context) {
 }
 
 // registerSubRoutes 注册子资源的标准 CRUD 路由
-//   GET    /{resource}      列表
-//   POST   /{resource}      创建
-//   PUT    /{resource}/:id  更新
-//   DELETE /{resource}/:id  删除
+//
+//	GET    /{resource}      列表
+//	POST   /{resource}      创建
+//	PUT    /{resource}/:id  更新
+//	DELETE /{resource}/:id  删除
 func registerSubRoutes(g *gin.RouterGroup, resource string, list, create, update, del gin.HandlerFunc) {
 	g.GET("/"+resource, list)
 	g.POST("/"+resource, create)

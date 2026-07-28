@@ -76,6 +76,37 @@ func (h *InterviewHandler) Get(c *gin.Context) {
 	})
 }
 
+// AttachResume POST /api/v1/interviews/:id/resume 在面试中发送简历
+// 将指定简历版本的快照写入面试会话，AI 在后续提问中会结合简历内容
+func (h *InterviewHandler) AttachResume(c *gin.Context) {
+	userID := c.GetUint(middleware.ContextUserID)
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+
+	var in services.AttachResumeInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		utils.BadRequest(c, err.Error())
+		return
+	}
+
+	interview, err := h.svc.AttachResume(userID, uint(id), &in)
+	if err != nil {
+		switch err {
+		case services.ErrInterviewNotFound:
+			utils.NotFound(c, err.Error())
+		case services.ErrResumeNotFound:
+			utils.NotFound(c, "resume not found")
+		case services.ErrVersionNotFound:
+			utils.NotFound(c, "resume version not found")
+		case services.ErrInterviewEnded:
+			utils.BadRequest(c, "interview already ended, cannot attach resume")
+		default:
+			utils.InternalError(c, err.Error())
+		}
+		return
+	}
+	utils.OKWithMsg(c, "resume attached", interview)
+}
+
 // SendMessage POST /api/v1/interviews/:id/messages 文字回答（SSE 流式）
 func (h *InterviewHandler) SendMessage(c *gin.Context) {
 	userID := c.GetUint(middleware.ContextUserID)
@@ -134,6 +165,8 @@ func (h *InterviewHandler) SendMessage(c *gin.Context) {
 }
 
 // SendVoice POST /api/v1/interviews/:id/voice 语音回答（multipart 上传）
+// SendVoice 接收用户语音回答
+// 上游模型：cfg.WhisperModel → "mimo-v2.5-asr"（语音识别，把用户语音转成文字）
 func (h *InterviewHandler) SendVoice(c *gin.Context) {
 	userID := c.GetUint(middleware.ContextUserID)
 	interviewID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -145,12 +178,12 @@ func (h *InterviewHandler) SendVoice(c *gin.Context) {
 	}
 	defer file.Close()
 
-	if !utils.IsAudioExt(header.Filename) {
-		utils.BadRequest(c, "unsupported audio format, only mp3/wav/m4a/webm/ogg allowed")
+	if !utils.IsMimoASRExt(header.Filename) {
+		utils.BadRequest(c, "unsupported audio format, MiMo ASR only accepts mp3/wav")
 		return
 	}
-	if !utils.ValidateFileSize(header.Size, 25) {
-		utils.BadRequest(c, "audio size exceeds 25MB limit")
+	if !utils.ValidateFileSize(header.Size, 7) {
+		utils.BadRequest(c, "audio size exceeds MiMo ASR limit")
 		return
 	}
 
@@ -197,7 +230,45 @@ func (h *InterviewHandler) SendVoice(c *gin.Context) {
 	flusher.Flush()
 }
 
+// TranscribeVoice POST /api/v1/interviews/:id/transcribe 仅转写语音草稿。
+// 此接口不创建面试回答、不增加题号，也不生成下一题。
+func (h *InterviewHandler) TranscribeVoice(c *gin.Context) {
+	userID := c.GetUint(middleware.ContextUserID)
+	interviewID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+
+	file, header, err := c.Request.FormFile("audio")
+	if err != nil {
+		utils.BadRequest(c, "audio field is required: "+err.Error())
+		return
+	}
+	defer file.Close()
+
+	if !utils.IsMimoASRExt(header.Filename) {
+		utils.BadRequest(c, "unsupported audio format, MiMo ASR only accepts mp3/wav")
+		return
+	}
+	if !utils.ValidateFileSize(header.Size, 7) {
+		utils.BadRequest(c, "audio size exceeds MiMo ASR limit")
+		return
+	}
+
+	text, err := h.svc.TranscribeVoice(c.Request.Context(), userID, uint(interviewID), file, header.Filename)
+	if err != nil {
+		switch err {
+		case services.ErrInterviewNotFound:
+			utils.NotFound(c, err.Error())
+		case services.ErrInterviewEnded:
+			utils.Conflict(c, err.Error())
+		default:
+			utils.InternalError(c, err.Error())
+		}
+		return
+	}
+	utils.OK(c, gin.H{"text": text})
+}
+
 // GetTTS GET /api/v1/interviews/:id/tts/:msgId 获取 AI 提问的 TTS 音频
+// 上游模型：cfg.TTSModel → "mimo-v2.5-tts"（语音生成，AI 面试官朗读，用户可选）
 func (h *InterviewHandler) GetTTS(c *gin.Context) {
 	userID := c.GetUint(middleware.ContextUserID)
 	interviewID, _ := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -213,7 +284,7 @@ func (h *InterviewHandler) GetTTS(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Content-Type", "audio/wav")
 	c.Header("Content-Disposition", "inline; filename=\""+filename+"\"")
 	c.Header("Content-Length", strconv.Itoa(len(audio)))
 	c.Writer.WriteHeader(200)

@@ -325,6 +325,8 @@ export interface Interview {
   target_company: string
   target_position: string
   target_jd: string
+  resume_snapshot: string
+  resume_name: string
   difficulty: InterviewDifficulty | string
   total_questions: number
   mode: InterviewMode
@@ -345,6 +347,12 @@ export interface CreateInterviewRequest {
   difficulty?: InterviewDifficulty
   total_questions?: number
   mode?: InterviewMode
+}
+
+// 面试发送简历请求
+export interface AttachResumeRequest {
+  resume_id: number
+  version_id?: number
 }
 
 // 面试消息
@@ -394,7 +402,18 @@ export interface InterviewReport {
   improvements: string // JSON 数组字符串
   recommendations: string // JSON 数组字符串
   word_cloud: string // JSON 对象字符串
+  question_feedback: string // JSON 数组字符串，每题的逐题评价
   created_at: string
+}
+
+// 面试复盘 - 逐题评价项
+export interface QuestionFeedbackItem {
+  question_no: number
+  question: string
+  answer: string
+  score: number
+  comment: string
+  suggestion: string
 }
 
 // ==================== SSE 事件相关 ====================
@@ -411,7 +430,7 @@ export type SSEEventType =
 export interface SSEEvent {
   type: SSEEventType
   content?: string
-  message?: string
+  message?: string | InterviewMessage
   interview?: Interview
   version?: ResumeVersion
 }
