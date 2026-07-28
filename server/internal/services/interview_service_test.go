@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -224,5 +225,21 @@ func TestTranscribeVoiceDoesNotAdvanceInterview(t *testing.T) {
 	}
 	if persisted.CurrentQuestionNo != 2 {
 		t.Fatalf("current question = %d, want 2", persisted.CurrentQuestionNo)
+	}
+}
+
+func TestStorageURLWithAbsoluteBase(t *testing.T) {
+	baseDir := filepath.Join(t.TempDir(), "uploads")
+	audioPath := filepath.Join(baseDir, "audio", "answer.wav")
+	got, err := storageURL(baseDir, audioPath)
+	if err != nil {
+		t.Fatalf("storageURL() error = %v", err)
+	}
+	if got != "/static/audio/answer.wav" {
+		t.Fatalf("storageURL() = %q", got)
+	}
+
+	if _, err := storageURL(baseDir, filepath.Join(filepath.Dir(baseDir), "outside.wav")); err == nil {
+		t.Fatal("storageURL() accepted path outside storage base")
 	}
 }

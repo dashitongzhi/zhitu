@@ -426,7 +426,7 @@ func (s *InterviewService) SendMessage(ctx context.Context, userID, interviewID 
 // 返回 AI 下一题的消息（含 TTS audio_url）
 func (s *InterviewService) SendVoice(ctx context.Context, userID, interviewID uint, audio io.Reader, filename string, onDelta func(string)) (*models.InterviewMessage, error) {
 	// 1. 保存音频文件到磁盘
-	relPath, absPath, err := utils.SaveFile(audio, s.storage.AudioDir, filename)
+	_, absPath, err := utils.SaveFile(audio, s.storage.AudioDir, filename)
 	if err != nil {
 		return nil, fmt.Errorf("save audio: %w", err)
 	}
@@ -446,11 +446,15 @@ func (s *InterviewService) SendVoice(ctx context.Context, userID, interviewID ui
 		return nil, ErrInterviewEnded
 	}
 
+	audioURL, err := storageURL(s.storage.BaseDir, absPath)
+	if err != nil {
+		return nil, err
+	}
 	userMsg := &models.InterviewMessage{
 		InterviewID: interviewID,
 		Role:        "user",
 		Content:     transcribed,
-		AudioURL:    "/static/" + relPath,
+		AudioURL:    audioURL,
 		QuestionNo:  interview.CurrentQuestionNo,
 	}
 	if err := s.db.Create(userMsg).Error; err != nil {
@@ -514,9 +518,11 @@ func (s *InterviewService) GetTTS(ctx context.Context, userID, interviewID, mess
 
 	// 若已有 audio_url，读取磁盘文件返回
 	if msg.AudioURL != "" {
-		absPath := strings.TrimPrefix(msg.AudioURL, "/static/")
-		cwd, _ := os.Getwd()
-		full := filepath.Join(cwd, absPath)
+		storedPath := strings.TrimPrefix(msg.AudioURL, "/static/")
+		full := storedPath
+		if !filepath.IsAbs(storedPath) {
+			full = filepath.Join(s.storage.BaseDir, filepath.FromSlash(storedPath))
+		}
 		data, err := os.ReadFile(full)
 		if err == nil {
 			return data, filepath.Base(full), nil
@@ -532,16 +538,38 @@ func (s *InterviewService) GetTTS(ctx context.Context, userID, interviewID, mess
 
 	// 保存到磁盘
 	filename := fmt.Sprintf("tts_%d.wav", msg.ID)
-	relPath, _, err := utils.SaveBytes(audio, s.storage.TTSDir, filename)
+	_, absPath, err := utils.SaveBytes(audio, s.storage.TTSDir, filename)
 	if err != nil {
 		return nil, "", fmt.Errorf("save tts: %w", err)
 	}
 
 	// 更新消息的 audio_url
-	audioURL := "/static/" + relPath
+	audioURL, err := storageURL(s.storage.BaseDir, absPath)
+	if err != nil {
+		return nil, "", err
+	}
 	s.db.Model(&msg).Update("audio_url", audioURL)
 
 	return audio, filename, nil
+}
+
+func storageURL(baseDir, absPath string) (string, error) {
+	baseAbs, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve storage base: %w", err)
+	}
+	fileAbs, err := filepath.Abs(absPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve stored file: %w", err)
+	}
+	rel, err := filepath.Rel(baseAbs, fileAbs)
+	if err != nil {
+		return "", fmt.Errorf("make storage url: %w", err)
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("stored file is outside storage base")
+	}
+	return "/static/" + filepath.ToSlash(rel), nil
 }
 
 // End 结束面试并生成复盘报告
