@@ -247,7 +247,7 @@ func (h *InterviewHandler) GetTTS(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Content-Type", "audio/wav")
 	c.Header("Content-Disposition", "inline; filename=\""+filename+"\"")
 	c.Header("Content-Length", strconv.Itoa(len(audio)))
 	c.Writer.WriteHeader(200)

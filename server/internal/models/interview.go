@@ -54,15 +54,16 @@ func (InterviewScore) TableName() string { return "interview_scores" }
 
 // InterviewReport 面试复盘报告
 type InterviewReport struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	InterviewID     uint      `gorm:"uniqueIndex;not null" json:"interview_id"`
-	OverallScore    int       `json:"overall_score"` // 0-100
-	Summary         string    `gorm:"type:text" json:"summary"`
-	Highlights      string    `gorm:"type:text" json:"highlights"`      // JSON 数组
-	Improvements    string    `gorm:"type:text" json:"improvements"`    // JSON 数组
-	Recommendations string    `gorm:"type:text" json:"recommendations"` // JSON 数组
-	WordCloud       string    `gorm:"type:text" json:"word_cloud"`      // JSON 对象
-	CreatedAt       time.Time `json:"created_at"`
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	InterviewID      uint      `gorm:"uniqueIndex;not null" json:"interview_id"`
+	OverallScore     int       `json:"overall_score"` // 0-100
+	Summary          string    `gorm:"type:text" json:"summary"`
+	Highlights       string    `gorm:"type:text" json:"highlights"`        // JSON 数组
+	Improvements     string    `gorm:"type:text" json:"improvements"`      // JSON 数组
+	Recommendations  string    `gorm:"type:text" json:"recommendations"`   // JSON 数组
+	WordCloud        string    `gorm:"type:text" json:"word_cloud"`        // JSON 对象
+	QuestionFeedback string    `gorm:"type:text" json:"question_feedback"` // JSON 数组，每题的逐题评价
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 func (InterviewReport) TableName() string { return "interview_reports" }

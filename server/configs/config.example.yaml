@@ -34,8 +34,19 @@ admin:
   email: "admin@zhitu.com"
   password: "admin123456"
 
-# LLM 接口配置（OpenAI 兼容，可替换为 DeepSeek/智谱/Moonshot 等）
-# OpenAI 模式下 base_url 末尾不要带斜杠；Anthropic 模式可填写完整 /messages 地址。
+# LLM 接口配置
+# provider 可选：openai / anthropic / mimo
+#
+# MiMo 部署示例（面试功能推荐配置）：
+#   provider: anthropic
+#   base_url: "https://api.xiaomimimo.com/anthropic/v1/messages"
+#   chat_model:      "mimo-v2.5-pro"   # 文字分析（提问、评分、报告）
+#   whisper_model:   "mimo-v2.5-asr"   # 语音识别（用户回答转文字）
+#   tts_model:        "mimo-v2.5-tts"   # 语音生成（AI 面试官朗读，用户可选）
+#   tts_voice:        "Chloe"           # 预置音色：冰糖/茉莉/苏打/白桦/Mia/Chloe/Milo/Dean
+#
+# 注意：mimo 的 ASR/TTS 不走 OpenAI 的 /audio/* 端点，
+# 代码内部统一通过 /v1/chat/completions 调用，无需额外配置。
 llm:
   provider: openai
   base_url: "https://api.openai.com/v1"

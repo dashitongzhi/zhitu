@@ -5,12 +5,13 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -114,16 +115,72 @@ type anthropicStreamEvent struct {
 	} `json:"error"`
 }
 
-// whisperResponse Whisper 转写响应
-type whisperResponse struct {
-	Text string `json:"text"`
+// === MiMo ASR (mimo-v2.5-asr) 请求/响应类型 ===
+// mimo ASR 不走 /v1/audio/transcriptions，而是通过 /v1/chat/completions
+// 用 input_audio 类型的 content 传入 base64 编码的音频
+
+// asrInputAudio ASR 输入音频
+type asrInputAudio struct {
+	Data string `json:"data"` // "data:{MIME};base64,{BASE64_AUDIO}"
 }
 
-// ttsRequest TTS 请求体
-type ttsRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
-	Voice string `json:"voice"`
+// asrContentItem ASR 消息 content 数组项
+type asrContentItem struct {
+	Type       string        `json:"type"` // "input_audio"
+	InputAudio asrInputAudio `json:"input_audio"`
+}
+
+// asrMessage ASR 请求消息（content 是数组而非字符串）
+type asrMessage struct {
+	Role    string           `json:"role"` // "user"
+	Content []asrContentItem `json:"content"`
+}
+
+// asrRequest mimo-v2.5-asr 请求体
+type asrRequest struct {
+	Model      string       `json:"model"`
+	Messages   []asrMessage `json:"messages"`
+	ASROptions struct {
+		Language string `json:"language"` // auto / zh / en
+	} `json:"asr_options"`
+}
+
+// === MiMo TTS (mimo-v2.5-tts) 请求/响应类型 ===
+// mimo TTS 不走 /v1/audio/speech，而是通过 /v1/chat/completions
+// 目标文本放在 role=assistant 的 content 中，audio 参数指定格式和音色
+
+// ttsMessage TTS 请求消息
+type ttsMessage struct {
+	Role    string `json:"role"`    // "assistant"
+	Content string `json:"content"` // 要合成的文本
+}
+
+// ttsAudioConfig TTS 音频配置
+type ttsAudioConfig struct {
+	Format string `json:"format"` // "wav" / "pcm16"
+	Voice  string `json:"voice"`  // "Chloe" / "冰糖" 等预置音色
+}
+
+// ttsRequestMimo mimo-v2.5-tts 请求体
+type ttsRequestMimo struct {
+	Model    string         `json:"model"`
+	Messages []ttsMessage   `json:"messages"`
+	Audio    ttsAudioConfig `json:"audio"`
+}
+
+// ttsResponseMimo TTS 响应（响应中 message.audio.data 是 base64 编码的音频）
+type ttsResponseMimo struct {
+	Choices []struct {
+		Message struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+			Audio   struct {
+				ID   string `json:"id"`
+				Data string `json:"data"` // base64 编码的音频字节
+			} `json:"audio"`
+		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
 }
 
 // LLM 错误
@@ -291,46 +348,59 @@ func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out i
 	return nil
 }
 
-// Transcribe 调用 Whisper 将音频转写为文本
-// audio 为音频文件内容（MP3/WAV/M4A 等），filename 用于 multipart 文件名
+// Transcribe 调用 MiMo ASR 将音频转写为文本
 //
-// 模型：cfg.WhisperModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-asr"
+// mimo ASR 不走 OpenAI 的 /v1/audio/transcriptions，而是通过 /v1/chat/completions
+// 将音频 base64 编码后放在 input_audio 类型的 content 中传入。
+//
+// 模型：cfg.WhisperModel → "mimo-v2.5-asr"（语音识别）
 // 用途：面试语音识别（用户语音回答转文字）
 func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename string) (string, error) {
 	if !s.IsConfigured() {
 		return "", ErrLLMNotConfigured
 	}
 
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	// 音频文件字段
-	part, err := writer.CreateFormFile("file", filename)
+	// 1. 读取音频并 base64 编码
+	audioBytes, err := io.ReadAll(audio)
 	if err != nil {
-		return "", fmt.Errorf("create form file: %w", err)
+		return "", fmt.Errorf("read audio: %w", err)
 	}
-	if _, err := io.Copy(part, audio); err != nil {
-		return "", fmt.Errorf("copy audio: %w", err)
-	}
-	// model 字段
-	if err := writer.WriteField("model", s.cfg.WhisperModel); err != nil {
-		return "", fmt.Errorf("write model field: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("close multipart writer: %w", err)
+	audioBase64 := base64.StdEncoding.EncodeToString(audioBytes)
+	mime := audioMIME(filename)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mime, audioBase64)
+
+	// 2. 构造 ASR 请求
+	reqBody := asrRequest{
+		Model: s.cfg.WhisperModel,
+		Messages: []asrMessage{{
+			Role: "user",
+			Content: []asrContentItem{{
+				Type:       "input_audio",
+				InputAudio: asrInputAudio{Data: dataURL},
+			}},
+		}},
+		ASROptions: struct {
+			Language string `json:"language"`
+		}{Language: "auto"},
 	}
 
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+
+	// 3. POST /v1/chat/completions
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		s.openAIBaseURL()+"/audio/transcriptions",
-		&buf,
+		s.openAIBaseURL()+"/chat/completions",
+		bytes.NewReader(body),
 	)
 	if err != nil {
 		return "", fmt.Errorf("new request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.cfg.APIKey)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -342,16 +412,24 @@ func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename s
 		return "", s.wrapAPIError(resp)
 	}
 
-	var result whisperResponse
+	// 4. 解析响应：choices[0].message.content 是识别出的文字
+	var result chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode whisper response: %w", err)
+		return "", fmt.Errorf("decode asr response: %w", err)
 	}
-	return strings.TrimSpace(result.Text), nil
+	if len(result.Choices) == 0 || result.Choices[0].Message.Content == "" {
+		return "", ErrLLMEmptyResponse
+	}
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 
-// Synthesize 调用 TTS 将文本合成为 MP3 音频字节
+// Synthesize 调用 MiMo TTS 将文本合成为 WAV 音频字节
 //
-// 模型：cfg.TTSModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-tts"
+// mimo TTS 不走 OpenAI 的 /v1/audio/speech，而是通过 /v1/chat/completions
+// 目标文本放在 role=assistant 的 content 中，audio 参数指定格式和音色。
+// 响应中 message.audio.data 是 base64 编码的音频字节。
+//
+// 模型：cfg.TTSModel → "mimo-v2.5-tts"（语音生成）
 // 用途：面试语音生成（AI 面试官朗读，前端用户可选开关）
 func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error) {
 	if !s.IsConfigured() {
@@ -361,20 +439,34 @@ func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error
 		return nil, errors.New("tts input text is empty")
 	}
 
-	reqBody := ttsRequest{
+	// 音色兜底：未配置或为 OpenAI 默认值时用 mimo 预置音色
+	voice := s.cfg.TTSVoice
+	if voice == "" || voice == "alloy" {
+		voice = "mimo_default"
+	}
+
+	// 1. 构造 TTS 请求
+	reqBody := ttsRequestMimo{
 		Model: s.cfg.TTSModel,
-		Input: text,
-		Voice: s.cfg.TTSVoice,
+		Messages: []ttsMessage{{
+			Role:    "assistant",
+			Content: text,
+		}},
+		Audio: ttsAudioConfig{
+			Format: "wav",
+			Voice:  voice,
+		},
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	// 2. POST /v1/chat/completions
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		s.openAIBaseURL()+"/audio/speech",
+		s.openAIBaseURL()+"/chat/completions",
 		bytes.NewReader(body),
 	)
 	if err != nil {
@@ -393,11 +485,40 @@ func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error
 		return nil, s.wrapAPIError(resp)
 	}
 
-	audio, err := io.ReadAll(resp.Body)
+	// 3. 解析响应：message.audio.data 是 base64 编码的 WAV 音频
+	var result ttsResponseMimo
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode tts response: %w", err)
+	}
+	if len(result.Choices) == 0 || result.Choices[0].Message.Audio.Data == "" {
+		return nil, ErrLLMEmptyResponse
+	}
+
+	// 4. base64 解码为音频字节
+	audio, err := base64.StdEncoding.DecodeString(result.Choices[0].Message.Audio.Data)
 	if err != nil {
-		return nil, fmt.Errorf("read tts audio: %w", err)
+		return nil, fmt.Errorf("decode base64 audio: %w", err)
 	}
 	return audio, nil
+}
+
+// audioMIME 根据音频文件扩展名返回 MIME 类型
+func audioMIME(filename string) string {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".wav":
+		return "audio/wav"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".m4a":
+		return "audio/mp4"
+	case ".ogg":
+		return "audio/ogg"
+	case ".flac":
+		return "audio/flac"
+	default:
+		return "audio/wav"
+	}
 }
 
 // doChat 执行非流式 Chat 请求

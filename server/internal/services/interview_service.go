@@ -514,7 +514,7 @@ func (s *InterviewService) GetTTS(ctx context.Context, userID, interviewID, mess
 	}
 
 	// 保存到磁盘
-	filename := fmt.Sprintf("tts_%d.mp3", msg.ID)
+	filename := fmt.Sprintf("tts_%d.wav", msg.ID)
 	relPath, _, err := utils.SaveBytes(audio, s.storage.TTSDir, filename)
 	if err != nil {
 		return nil, "", fmt.Errorf("save tts: %w", err)
@@ -860,13 +860,26 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 %s
 
 如果候选人发送了简历，请在复盘报告中结合简历内容评估其经历表达与岗位匹配度。
+
+请逐题回顾候选人的回答表现，对每一道题给出评价。question_no 从 1 开始；第一题通常是开场题，也需要评价。score 为该题的独立百分制评分（0-100），comment 指出回答的亮点与不足，suggestion 给出更优回答方向。
+
 返回 JSON：
 {
   "summary": "总体评价文本",
   "highlights": ["亮点1","亮点2"],
   "improvements": ["改进建议1","改进建议2"],
   "recommendations": ["推荐练习方向1","推荐练习方向2"],
-  "word_cloud": [{"word":"高频词","count":5}]
+  "word_cloud": [{"word":"高频词","count":5}],
+  "question_feedback": [
+    {
+      "question_no": 1,
+      "question": "面试官原题文本",
+      "answer": "候选人回答的摘要（可截断）",
+      "score": 82,
+      "comment": "对这一题的点评，指出亮点与不足",
+      "suggestion": "针对该题的更优回答方向或要点"
+    }
+  ]
 }
 只返回 JSON。`, interview.Scene, interview.TargetPosition, string(scoresJSON),
 		nonEmpty(summarizeResume(interview.ResumeSnapshot), "（候选人未发送简历）"),
@@ -886,6 +899,14 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 			Word  string `json:"word"`
 			Count int    `json:"count"`
 		} `json:"word_cloud"`
+		QuestionFeedback []struct {
+			QuestionNo int    `json:"question_no"`
+			Question   string `json:"question"`
+			Answer     string `json:"answer"`
+			Score      int    `json:"score"`
+			Comment    string `json:"comment"`
+			Suggestion string `json:"suggestion"`
+		} `json:"question_feedback"`
 	}
 	if err := s.llm.ChatJSON(ctx, messagesLLM, &reportData); err != nil {
 		return err
@@ -895,15 +916,17 @@ func (s *InterviewService) generateReport(ctx context.Context, interview *models
 	improvements, _ := json.Marshal(reportData.Improvements)
 	recommendations, _ := json.Marshal(reportData.Recommendations)
 	wordCloud, _ := json.Marshal(reportData.WordCloud)
+	questionFeedback, _ := json.Marshal(reportData.QuestionFeedback)
 
 	report := &models.InterviewReport{
-		InterviewID:     interview.ID,
-		OverallScore:    overallScore,
-		Summary:         reportData.Summary,
-		Highlights:      string(highlights),
-		Improvements:    string(improvements),
-		Recommendations: string(recommendations),
-		WordCloud:       string(wordCloud),
+		InterviewID:      interview.ID,
+		OverallScore:     overallScore,
+		Summary:          reportData.Summary,
+		Highlights:       string(highlights),
+		Improvements:     string(improvements),
+		Recommendations:  string(recommendations),
+		WordCloud:        string(wordCloud),
+		QuestionFeedback: string(questionFeedback),
 	}
 	return s.db.Create(report).Error
 }

@@ -402,7 +402,18 @@ export interface InterviewReport {
   improvements: string // JSON 数组字符串
   recommendations: string // JSON 数组字符串
   word_cloud: string // JSON 对象字符串
+  question_feedback: string // JSON 数组字符串，每题的逐题评价
   created_at: string
+}
+
+// 面试复盘 - 逐题评价项
+export interface QuestionFeedbackItem {
+  question_no: number
+  question: string
+  answer: string
+  score: number
+  comment: string
+  suggestion: string
 }
 
 // ==================== SSE 事件相关 ====================
