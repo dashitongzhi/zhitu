@@ -299,7 +299,7 @@
                       type="success"
                       show-icon
                       :message="`简历：${interviewStore.currentInterview.resume_name || '未命名简历'}`"
-                      description="AI 将在后续提问中结合该简历内容进行追问，评分与复盘也会参考简历经历。"
+                      description="已绑定至本次面试。"
                     />
                     <a-empty
                       v-else
@@ -474,7 +474,7 @@
         </a-empty>
         <div v-else class="resume-modal-body">
           <p class="modal-tip">
-            选择一份简历发送给 AI 面试官，AI 将在后续提问中结合简历的项目、工作经历、技能进行深挖追问，评分与复盘也会参考简历。
+            选择一份简历绑定到本次面试。
           </p>
           <a-form layout="vertical">
             <a-form-item label="选择简历">

@@ -78,7 +78,7 @@ export const useInterviewStore = defineStore('interview', () => {
       if (updated && currentInterview.value?.id === interviewId) {
         currentInterview.value = updated
       }
-      message.success('简历已发送，AI 将在后续提问中结合简历内容')
+      message.success('简历已发送')
       return updated || null
     } catch (error) {
       console.error('发送简历失败:', error)
