@@ -148,26 +148,30 @@
                 v-model:value="inputText"
                 :rows="3"
                 placeholder="输入你的回答..."
-                :disabled="interviewStore.sending"
+                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing"
                 @keydown.enter.exact.prevent="handleSendText"
               />
               <div class="input-toolbar">
                 <div class="toolbar-left">
-                  <!-- 语音上传（mode 为 voice/hybrid 时可用） -->
-                  <a-upload
+                  <!-- 麦克风录音（mode 为 voice/hybrid 时可用） -->
+                  <a-button
                     v-if="canSendVoice"
-                    :before-upload="handleSendVoice"
-                    :show-upload-list="false"
-                    accept="audio/*,mp3,wav,m4a,webm,ogg"
+                    :danger="isRecording"
+                    :loading="voicePreparing || recordingFinalizing"
+                    :disabled="interviewStore.sending || voicePreparing || recordingFinalizing"
+                    :class="{ 'recording-button': isRecording }"
+                    @click="toggleVoiceRecording"
                   >
-                    <a-button :disabled="interviewStore.sending">
-                      <AudioOutlined /> 语音回答
-                    </a-button>
-                  </a-upload>
+                    <AudioOutlined />
+                    <span v-if="voicePreparing">正在获取麦克风</span>
+                    <span v-else-if="recordingFinalizing">正在发送录音</span>
+                    <span v-else-if="isRecording">结束并发送 {{ recordingTimeLabel }}</span>
+                    <span v-else>语音回答</span>
+                  </a-button>
                   <!-- 发送简历：把简历绑定到本次面试，AI 后续提问会结合简历内容 -->
                   <a-button
                     :type="resumeAttached ? 'default' : 'dashed'"
-                    :disabled="interviewStore.sending || !isOngoing"
+                    :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !isOngoing"
                     @click="openResumeModal"
                   >
                     <FileTextOutlined />
@@ -180,7 +184,7 @@
                   <a-button
                     type="primary"
                     :loading="interviewStore.sending"
-                    :disabled="!inputText.trim()"
+                    :disabled="!inputText.trim() || isRecording || voicePreparing || recordingFinalizing"
                     @click="handleSendText"
                   >
                     <SendOutlined /> 发送
@@ -445,7 +449,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Modal, message, Empty, type TableColumnsType } from 'ant-design-vue'
 import {
@@ -486,6 +490,22 @@ const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const audioPlayer = ref<HTMLAudioElement | null>(null)
 const sideTab = ref<'info' | 'report' | 'scores'>('info')
+
+// 麦克风录音状态
+const isRecording = ref(false)
+const voicePreparing = ref(false)
+const recordingFinalizing = ref(false)
+const recordingSeconds = ref(0)
+const recordingTimeLabel = computed(() => {
+  const minutes = Math.floor(recordingSeconds.value / 60)
+  const seconds = recordingSeconds.value % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+})
+let mediaRecorder: MediaRecorder | null = null
+let microphoneStream: MediaStream | null = null
+let recordingTimer: number | null = null
+let recordedChunks: Blob[] = []
+let discardRecordedVoice = false
 
 // 加载状态
 const reportLoading = ref(false)
@@ -821,19 +841,166 @@ const handleSendText = async () => {
   await interviewStore.sendMessage(interviewId.value, content)
 }
 
-// 发送语音回答
-const handleSendVoice = async (file: File): Promise<boolean> => {
+// ============ 麦克风录音回答 ============
+
+const stopRecordingTimer = () => {
+  if (recordingTimer !== null) {
+    window.clearInterval(recordingTimer)
+    recordingTimer = null
+  }
+}
+
+const releaseMicrophone = () => {
+  microphoneStream?.getTracks().forEach((track) => track.stop())
+  microphoneStream = null
+}
+
+const recordingFileExtension = (mimeType: string) => {
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('ogg')) return 'ogg'
+  return 'webm'
+}
+
+const finalizeVoiceRecording = async (recorder: MediaRecorder) => {
+  const shouldDiscard = discardRecordedVoice
+  const chunks = recordedChunks
+  recordedChunks = []
+  stopRecordingTimer()
+  releaseMicrophone()
+  mediaRecorder = null
+  isRecording.value = false
+  recordingSeconds.value = 0
+
+  if (shouldDiscard) {
+    discardRecordedVoice = false
+    recordingFinalizing.value = false
+    return
+  }
+
+  const mimeType = recorder.mimeType || chunks[0]?.type || 'audio/webm'
+  const audioBlob = new Blob(chunks, { type: mimeType })
+  if (audioBlob.size === 0) {
+    message.error('没有录到声音，请重新尝试')
+    recordingFinalizing.value = false
+    return
+  }
+  if (audioBlob.size > 25 * 1024 * 1024) {
+    message.error('录音不能超过 25MB')
+    recordingFinalizing.value = false
+    return
+  }
+
+  recordingFinalizing.value = true
+  try {
+    const file = new File(
+      [audioBlob],
+      `voice-answer-${Date.now()}.${recordingFileExtension(mimeType)}`,
+      { type: mimeType }
+    )
+    await interviewStore.sendVoice(interviewId.value, file)
+  } finally {
+    recordingFinalizing.value = false
+  }
+}
+
+const startVoiceRecording = async () => {
   if (!isOngoing.value) {
     message.warning('面试已结束，无法继续作答')
-    return false
+    return
   }
-  if (file.size > 25 * 1024 * 1024) {
-    message.error('音频文件不能超过 25MB')
-    return false
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    message.error('当前浏览器不支持麦克风录音，请使用最新版 Chrome、Edge 或 Safari')
+    return
   }
-  await interviewStore.sendVoice(interviewId.value, file)
-  return false // 阻止 a-upload 自动上传
+
+  voicePreparing.value = true
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    })
+    microphoneStream = stream
+    const preferredMimeTypes = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+    ]
+    const mimeType = preferredMimeTypes.find((type) =>
+      MediaRecorder.isTypeSupported(type)
+    )
+    const recorder = new MediaRecorder(
+      stream,
+      mimeType ? { mimeType } : undefined
+    )
+
+    mediaRecorder = recorder
+    recordedChunks = []
+    discardRecordedVoice = false
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordedChunks.push(event.data)
+    }
+    recorder.onerror = () => {
+      message.error('录音过程中发生错误，请重新尝试')
+      discardRecordedVoice = true
+      if (recorder.state !== 'inactive') recorder.stop()
+    }
+    recorder.onstop = () => {
+      void finalizeVoiceRecording(recorder)
+    }
+
+    recorder.start(250)
+    isRecording.value = true
+    recordingSeconds.value = 0
+    recordingTimer = window.setInterval(() => {
+      recordingSeconds.value += 1
+    }, 1000)
+  } catch (error) {
+    releaseMicrophone()
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      message.error('未获得麦克风权限，请在浏览器地址栏允许访问麦克风')
+    } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+      message.error('未检测到可用的麦克风')
+    } else {
+      message.error('启动录音失败，请检查麦克风后重试')
+    }
+  } finally {
+    voicePreparing.value = false
+  }
 }
+
+const stopVoiceRecording = () => {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return
+  isRecording.value = false
+  recordingFinalizing.value = true
+  stopRecordingTimer()
+  mediaRecorder.stop()
+}
+
+const toggleVoiceRecording = async () => {
+  if (isRecording.value) {
+    stopVoiceRecording()
+    return
+  }
+  await startVoiceRecording()
+}
+
+const discardVoiceRecording = () => {
+  discardRecordedVoice = true
+  stopRecordingTimer()
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  } else {
+    releaseMicrophone()
+  }
+  isRecording.value = false
+}
+
+onBeforeUnmount(discardVoiceRecording)
 
 // TTS 播放
 const handlePlayTts = async (msgId: number) => {
@@ -1306,6 +1473,10 @@ onMounted(async () => {
 
 .hidden-audio {
   display: none;
+}
+
+.recording-button {
+  box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.12);
 }
 
 .resume-block-info {
