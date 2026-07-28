@@ -325,6 +325,8 @@ export interface Interview {
   target_company: string
   target_position: string
   target_jd: string
+  resume_snapshot: string
+  resume_name: string
   difficulty: InterviewDifficulty | string
   total_questions: number
   mode: InterviewMode
@@ -345,6 +347,12 @@ export interface CreateInterviewRequest {
   difficulty?: InterviewDifficulty
   total_questions?: number
   mode?: InterviewMode
+}
+
+// 面试发送简历请求
+export interface AttachResumeRequest {
+  resume_id: number
+  version_id?: number
 }
 
 // 面试消息

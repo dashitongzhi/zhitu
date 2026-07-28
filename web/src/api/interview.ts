@@ -5,6 +5,7 @@ import type {
   Interview,
   InterviewDetail,
   CreateInterviewRequest,
+  AttachResumeRequest,
   InterviewMessage,
   InterviewReport,
   InterviewScore,
@@ -27,6 +28,14 @@ export const getInterview = (id: number) => {
 // 创建面试会话
 export const createInterview = (data: CreateInterviewRequest) => {
   return post<ApiResponse<Interview>>('/api/v1/interviews', data)
+}
+
+// 在面试中发送简历（把指定简历版本的快照绑定到面试会话）
+export const attachResume = (interviewId: number, data: AttachResumeRequest) => {
+  return post<ApiResponse<Interview>>(
+    `/api/v1/interviews/${interviewId}/resume`,
+    data
+  )
 }
 
 // 发送文字回答（SSE 流式）

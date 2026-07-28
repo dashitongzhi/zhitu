@@ -17,7 +17,7 @@ import (
 	"github.com/zhitu/server/internal/config"
 )
 
-// LLMService 封装 OpenAI 兼容接口的调用
+// LLMService 封装 OpenAI Chat Completions 与 Anthropic Messages 接口的调用
 // 直接用 net/http，不引入第三方 SDK，便于切换 provider
 type LLMService struct {
 	cfg    *config.LLMConfig
@@ -26,7 +26,7 @@ type LLMService struct {
 
 // ChatMessage OpenAI Chat Completions 消息格式
 type ChatMessage struct {
-	Role    string `json:"role"`    // system / user / assistant
+	Role    string `json:"role"` // system / user / assistant
 	Content string `json:"content"`
 }
 
@@ -45,16 +45,20 @@ type respFormat struct {
 	Type string `json:"type"` // "json_object"
 }
 
+type chatResponseMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type chatResponseChoice struct {
+	Message      chatResponseMessage `json:"message"`
+	FinishReason string              `json:"finish_reason"`
+}
+
 // chatResponse 非流式响应体
 type chatResponse struct {
-	Choices []struct {
-		Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"message"`
-		FinishReason string `json:"finish_reason"`
-	} `json:"choices"`
-	Usage struct {
+	Choices []chatResponseChoice `json:"choices"`
+	Usage   struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 		TotalTokens      int `json:"total_tokens"`
@@ -70,6 +74,44 @@ type streamChunk struct {
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
+}
+
+// anthropicRequest Anthropic Messages 请求体。
+// Anthropic 将 system 提示词放在顶层，其余消息只允许 user / assistant。
+type anthropicRequest struct {
+	Model       string        `json:"model"`
+	System      string        `json:"system,omitempty"`
+	Messages    []ChatMessage `json:"messages"`
+	Temperature float64       `json:"temperature,omitempty"`
+	MaxTokens   int           `json:"max_tokens"`
+	Stream      bool          `json:"stream,omitempty"`
+}
+
+type anthropicResponse struct {
+	Type    string `json:"type"`
+	Role    string `json:"role"`
+	Model   string `json:"model"`
+	Content []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"content"`
+	StopReason string `json:"stop_reason"`
+	Usage      struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
+}
+
+type anthropicStreamEvent struct {
+	Type  string `json:"type"`
+	Delta struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"delta"`
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 // whisperResponse Whisper 转写响应
@@ -111,6 +153,9 @@ func (s *LLMService) IsConfigured() bool {
 }
 
 // Chat 非流式对话，返回完整文本
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（提问生成、评分、复盘报告等所有非流式 LLM 调用）
 func (s *LLMService) Chat(ctx context.Context, messages []ChatMessage) (string, error) {
 	if !s.IsConfigured() {
 		return "", ErrLLMNotConfigured
@@ -135,6 +180,9 @@ func (s *LLMService) Chat(ctx context.Context, messages []ChatMessage) (string, 
 
 // ChatStream 流式对话，通过 onDelta 回调逐 token 推送
 // 调用方负责在 HTTP handler 中设置 SSE 头并写入响应流
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（AI 面试官流式提问）
 func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onDelta func(delta string)) error {
 	if !s.IsConfigured() {
 		return ErrLLMNotConfigured
@@ -146,6 +194,10 @@ func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onD
 		Temperature: s.cfg.Temperature,
 		MaxTokens:   s.cfg.MaxTokens,
 		Stream:      true,
+	}
+
+	if s.isAnthropic() {
+		return s.chatStreamAnthropic(ctx, reqBody, onDelta)
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -201,6 +253,9 @@ func (s *LLMService) ChatStream(ctx context.Context, messages []ChatMessage, onD
 
 // ChatJSON 对话并要求返回 JSON，自动解析到 out
 // out 必须是指针。prompt 中应明确要求 JSON 格式与字段。
+//
+// 模型：cfg.ChatModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-pro"
+// 用途：面试文字分析（评分、复盘报告等结构化输出）
 func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out interface{}) error {
 	if !s.IsConfigured() {
 		return ErrLLMNotConfigured
@@ -238,6 +293,9 @@ func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out i
 
 // Transcribe 调用 Whisper 将音频转写为文本
 // audio 为音频文件内容（MP3/WAV/M4A 等），filename 用于 multipart 文件名
+//
+// 模型：cfg.WhisperModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-asr"
+// 用途：面试语音识别（用户语音回答转文字）
 func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename string) (string, error) {
 	if !s.IsConfigured() {
 		return "", ErrLLMNotConfigured
@@ -262,7 +320,12 @@ func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename s
 		return "", fmt.Errorf("close multipart writer: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.BaseURL+"/audio/transcriptions", &buf)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		s.openAIBaseURL()+"/audio/transcriptions",
+		&buf,
+	)
 	if err != nil {
 		return "", fmt.Errorf("new request: %w", err)
 	}
@@ -287,6 +350,9 @@ func (s *LLMService) Transcribe(ctx context.Context, audio io.Reader, filename s
 }
 
 // Synthesize 调用 TTS 将文本合成为 MP3 音频字节
+//
+// 模型：cfg.TTSModel —— 面试功能对接 mimo 时应配置为 "mimo-v2.5-tts"
+// 用途：面试语音生成（AI 面试官朗读，前端用户可选开关）
 func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error) {
 	if !s.IsConfigured() {
 		return nil, ErrLLMNotConfigured
@@ -305,7 +371,12 @@ func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.BaseURL+"/audio/speech", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		s.openAIBaseURL()+"/audio/speech",
+		bytes.NewReader(body),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
@@ -331,6 +402,10 @@ func (s *LLMService) Synthesize(ctx context.Context, text string) ([]byte, error
 
 // doChat 执行非流式 Chat 请求
 func (s *LLMService) doChat(ctx context.Context, reqBody chatRequest) (*chatResponse, error) {
+	if s.isAnthropic() {
+		return s.doChatAnthropic(ctx, reqBody)
+	}
+
 	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -358,6 +433,196 @@ func (s *LLMService) doChat(ctx context.Context, reqBody chatRequest) (*chatResp
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
+}
+
+func (s *LLMService) isAnthropic() bool {
+	provider := strings.ToLower(strings.TrimSpace(s.cfg.Provider))
+	return provider == "anthropic" || provider == "mimo-anthropic"
+}
+
+func (s *LLMService) anthropicEndpoint() string {
+	base := strings.TrimRight(strings.TrimSpace(s.cfg.BaseURL), "/")
+	if strings.HasSuffix(base, "/messages") {
+		return base
+	}
+	return base + "/messages"
+}
+
+// openAIBaseURL 返回语音接口使用的 OpenAI 兼容 API 根地址。
+// 当聊天使用 MiMo Anthropic 入口时，语音能力仍位于同域名的 /v1 下。
+func (s *LLMService) openAIBaseURL() string {
+	base := strings.TrimRight(strings.TrimSpace(s.cfg.BaseURL), "/")
+	if !s.isAnthropic() {
+		return base
+	}
+	if marker := strings.Index(base, "/anthropic/"); marker >= 0 {
+		return base[:marker] + "/v1"
+	}
+	if strings.HasSuffix(base, "/messages") {
+		return strings.TrimSuffix(base, "/messages")
+	}
+	return base
+}
+
+func (s *LLMService) newAnthropicRequest(ctx context.Context, payload interface{}) (*http.Request, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		s.anthropicEndpoint(),
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+	req.Header.Set("Anthropic-Version", "2023-06-01")
+	return req, nil
+}
+
+func toAnthropicRequest(reqBody chatRequest) anthropicRequest {
+	var systemParts []string
+	messages := make([]ChatMessage, 0, len(reqBody.Messages))
+	for _, message := range reqBody.Messages {
+		switch strings.ToLower(message.Role) {
+		case "system":
+			if strings.TrimSpace(message.Content) != "" {
+				systemParts = append(systemParts, message.Content)
+			}
+		case "assistant":
+			messages = append(messages, ChatMessage{Role: "assistant", Content: message.Content})
+		default:
+			messages = append(messages, ChatMessage{Role: "user", Content: message.Content})
+		}
+	}
+	return anthropicRequest{
+		Model:       reqBody.Model,
+		System:      strings.Join(systemParts, "\n\n"),
+		Messages:    messages,
+		Temperature: reqBody.Temperature,
+		MaxTokens:   reqBody.MaxTokens,
+		Stream:      reqBody.Stream,
+	}
+}
+
+func (s *LLMService) doChatAnthropic(ctx context.Context, reqBody chatRequest) (*chatResponse, error) {
+	req, err := s.newAnthropicRequest(ctx, toAnthropicRequest(reqBody))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, s.wrapAPIError(resp)
+	}
+
+	var anthropicResult anthropicResponse
+	if err := json.NewDecoder(resp.Body).Decode(&anthropicResult); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	var content strings.Builder
+	for _, block := range anthropicResult.Content {
+		if block.Type == "text" {
+			content.WriteString(block.Text)
+		}
+	}
+
+	return &chatResponse{
+		Choices: []chatResponseChoice{{
+			Message: chatResponseMessage{
+				Role:    "assistant",
+				Content: content.String(),
+			},
+			FinishReason: anthropicResult.StopReason,
+		}},
+		Usage: struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		}{
+			PromptTokens:     anthropicResult.Usage.InputTokens,
+			CompletionTokens: anthropicResult.Usage.OutputTokens,
+			TotalTokens:      anthropicResult.Usage.InputTokens + anthropicResult.Usage.OutputTokens,
+		},
+	}, nil
+}
+
+func (s *LLMService) chatStreamAnthropic(
+	ctx context.Context,
+	reqBody chatRequest,
+	onDelta func(delta string),
+) error {
+	anthropicBody := toAnthropicRequest(reqBody)
+	anthropicBody.Stream = true
+	req, err := s.newAnthropicRequest(ctx, anthropicBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "text/event-stream")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return s.wrapAPIError(resp)
+	}
+
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	sawText := false
+	sawStop := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		var event anthropicStreamEvent
+		data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			continue
+		}
+		if event.Type == "error" {
+			return fmt.Errorf(
+				"%w: anthropic %s: %s",
+				ErrLLMStreamFailed,
+				event.Error.Type,
+				truncate(event.Error.Message, 500),
+			)
+		}
+		if event.Type == "message_stop" {
+			sawStop = true
+			break
+		}
+		if event.Type == "content_block_delta" &&
+			event.Delta.Type == "text_delta" &&
+			event.Delta.Text != "" {
+			sawText = true
+			if onDelta != nil {
+				onDelta(event.Delta.Text)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("%w: %v", ErrLLMStreamFailed, err)
+	}
+	if !sawStop {
+		return fmt.Errorf("%w: missing message_stop", ErrLLMStreamFailed)
+	}
+	if !sawText {
+		return fmt.Errorf("%w: empty text stream", ErrLLMStreamFailed)
+	}
+	return nil
 }
 
 // wrapAPIError 读取错误响应体并包装为 error

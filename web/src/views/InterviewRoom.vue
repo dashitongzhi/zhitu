@@ -164,6 +164,16 @@
                       <AudioOutlined /> 语音回答
                     </a-button>
                   </a-upload>
+                  <!-- 发送简历：把简历绑定到本次面试，AI 后续提问会结合简历内容 -->
+                  <a-button
+                    :type="resumeAttached ? 'default' : 'dashed'"
+                    :disabled="interviewStore.sending || !isOngoing"
+                    @click="openResumeModal"
+                  >
+                    <FileTextOutlined />
+                    <span v-if="resumeAttached">简历已发送</span>
+                    <span v-else>发送简历</span>
+                  </a-button>
                   <span class="input-hint">Enter 发送 · Shift+Enter 换行</span>
                 </div>
                 <div class="toolbar-right">
@@ -234,6 +244,22 @@
                     <div class="jd-content">
                       {{ interviewStore.currentInterview.target_jd }}
                     </div>
+                  </div>
+
+                  <div class="resume-block-info">
+                    <div class="block-title">已发送简历</div>
+                    <a-alert
+                      v-if="resumeAttached"
+                      type="success"
+                      show-icon
+                      :message="`简历：${interviewStore.currentInterview.resume_name || '未命名简历'}`"
+                      description="AI 将在后续提问中结合该简历内容进行追问，评分与复盘也会参考简历经历。"
+                    />
+                    <a-empty
+                      v-else
+                      description="尚未发送简历，可在输入区点击「发送简历」绑定"
+                      :image="simpleImage"
+                    />
                   </div>
                 </div>
                 <a-empty v-else description="暂无信息" />
@@ -343,6 +369,78 @@
 
     <!-- 隐藏的 audio 元素用于 TTS 播放 -->
     <audio ref="audioPlayer" class="hidden-audio" />
+
+    <!-- 发送简历弹窗：选择简历 + 版本 -->
+    <a-modal
+      v-model:open="resumeModalVisible"
+      title="发送简历给 AI 面试官"
+      ok-text="发送简历"
+      cancel-text="取消"
+      :ok-button-props="{ loading: attaching, disabled: !selectedResumeId }"
+      :cancel-button-props="{ disabled: attaching }"
+      :mask-closable="false"
+      width="520px"
+      @ok="confirmAttachResume"
+    >
+      <a-spin :spinning="loadingResumes" tip="加载简历列表...">
+        <a-empty
+          v-if="!loadingResumes && resumeList.length === 0"
+          description="还没有简历，请先到「简历实验室」创建简历"
+        >
+          <a-button type="primary" @click="goToResumeLab">前往简历实验室</a-button>
+        </a-empty>
+        <div v-else class="resume-modal-body">
+          <p class="modal-tip">
+            选择一份简历发送给 AI 面试官，AI 将在后续提问中结合简历的项目、工作经历、技能进行深挖追问，评分与复盘也会参考简历。
+          </p>
+          <a-form layout="vertical">
+            <a-form-item label="选择简历">
+              <a-select
+                v-model:value="selectedResumeId"
+                placeholder="请选择简历"
+                :disabled="attaching"
+                @change="onResumeChange"
+              >
+                <a-select-option
+                  v-for="r in resumeList"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }}
+                  <span class="resume-meta">
+                    （{{ r.target_position || '未指定岗位' }}）
+                  </span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="选择版本">
+              <a-select
+                v-model:value="selectedVersionId"
+                placeholder="默认使用当前版本"
+                :disabled="attaching || !selectedResumeId || loadingVersions"
+                :loading="loadingVersions"
+              >
+                <a-select-option :value="0">当前版本</a-select-option>
+                <a-select-option
+                  v-for="v in versionList"
+                  :key="v.id"
+                  :value="v.id"
+                >
+                  {{ v.version_label }}
+                  <span class="resume-meta">· {{ formatVersionTime(v.created_at) }}</span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+          <a-alert
+            v-if="resumeAttached"
+            type="info"
+            show-icon
+            message="本次面试已绑定过简历，再次发送将覆盖之前绑定的简历。"
+          />
+        </div>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -357,18 +455,22 @@ import {
   SoundOutlined,
   AudioOutlined,
   SendOutlined,
+  FileTextOutlined,
   CheckCircleOutlined,
   WarningOutlined,
   BulbOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import { useInterviewStore } from '@/stores/interview'
+import { listResumes, listVersions } from '@/api/resume'
 import type {
   InterviewScene,
   InterviewMode,
   InterviewDifficulty,
   InterviewStatus,
   InterviewDimension,
+  Resume,
+  ResumeVersion,
 } from '@/types/models'
 
 const route = useRoute()
@@ -389,6 +491,19 @@ const sideTab = ref<'info' | 'report' | 'scores'>('info')
 const reportLoading = ref(false)
 const scoresLoading = ref(false)
 const ttsLoadingId = ref<number | null>(null)
+
+// 发送简历相关状态
+const resumeModalVisible = ref(false)
+const loadingResumes = ref(false)
+const loadingVersions = ref(false)
+const attaching = ref(false)
+const resumeList = ref<Resume[]>([])
+const versionList = ref<ResumeVersion[]>([])
+const selectedResumeId = ref<number | null>(null)
+const selectedVersionId = ref<number>(0)
+const resumeAttached = computed(
+  () => !!interviewStore.currentInterview?.resume_snapshot
+)
 
 // 计算属性
 const isOngoing = computed(
@@ -599,6 +714,99 @@ const formatTime = (dateStr: string | null | undefined): string => {
 const backToList = () => {
   interviewStore.clearCurrent()
   router.push('/app/interviews')
+}
+
+// ============ 发送简历相关 ============
+
+// 前往简历实验室（无简历时）
+const goToResumeLab = () => {
+  resumeModalVisible.value = false
+  router.push('/app/resumes')
+}
+
+// 版本时间格式化（用于下拉展示）
+const formatVersionTime = (dateStr: string): string => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// 拉取用户简历列表
+const loadResumes = async () => {
+  loadingResumes.value = true
+  try {
+    const resp = await listResumes()
+    resumeList.value = resp.data.data || []
+    // 默认选中第一份简历
+    if (resumeList.value.length > 0 && selectedResumeId.value === null) {
+      selectedResumeId.value = resumeList.value[0].id
+      await loadVersions(resumeList.value[0].id)
+    }
+  } catch (error) {
+    console.error('加载简历列表失败:', error)
+    message.error('加载简历列表失败')
+  } finally {
+    loadingResumes.value = false
+  }
+}
+
+// 选择简历时加载版本列表
+const onResumeChange = async (resumeId: number) => {
+  selectedVersionId.value = 0
+  versionList.value = []
+  if (!resumeId) return
+  await loadVersions(resumeId)
+}
+
+const loadVersions = async (resumeId: number) => {
+  loadingVersions.value = true
+  try {
+    const resp = await listVersions(resumeId)
+    versionList.value = resp.data.data || []
+  } catch (error) {
+    console.error('加载简历版本失败:', error)
+  } finally {
+    loadingVersions.value = false
+  }
+}
+
+// 打开发送简历弹窗
+const openResumeModal = async () => {
+  resumeModalVisible.value = true
+  if (resumeList.value.length === 0) {
+    await loadResumes()
+  }
+}
+
+// 确认发送简历
+const confirmAttachResume = async () => {
+  if (!selectedResumeId.value) {
+    message.warning('请先选择一份简历')
+    return
+  }
+  if (!isOngoing.value) {
+    message.warning('面试已结束，无法发送简历')
+    return
+  }
+  attaching.value = true
+  try {
+    const attached = await interviewStore.attachResume(interviewId.value, {
+      resume_id: selectedResumeId.value,
+      version_id: selectedVersionId.value || undefined,
+    })
+    if (!attached) return
+    resumeModalVisible.value = false
+    // 切到面试信息 Tab，让用户看到已发送简历的展示
+    sideTab.value = 'info'
+  } finally {
+    attaching.value = false
+  }
 }
 
 // 发送文字回答
@@ -1098,5 +1306,25 @@ onMounted(async () => {
 
 .hidden-audio {
   display: none;
+}
+
+.resume-block-info {
+  margin-top: 16px;
+}
+
+.resume-modal-body {
+  padding-top: 4px;
+}
+
+.modal-tip {
+  margin: 0 0 16px 0;
+  color: #595959;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.resume-meta {
+  color: #8c8c8c;
+  font-size: 12px;
 }
 </style>

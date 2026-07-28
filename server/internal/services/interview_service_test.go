@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -59,5 +61,76 @@ func TestCreateSupportsAllSceneHallScenesWithoutLLM(t *testing.T) {
 				t.Fatal("first question is empty")
 			}
 		})
+	}
+}
+
+func TestAttachResumeUsesOwnedCurrentVersion(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:attach_resume_test?mode=memory&cache=shared"), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
+	if err != nil {
+		t.Fatalf("open test database: %v", err)
+	}
+	if err := db.AutoMigrate(
+		&models.Interview{},
+		&models.Resume{},
+		&models.ResumeVersion{},
+	); err != nil {
+		t.Fatalf("migrate test database: %v", err)
+	}
+
+	interview := models.Interview{UserID: 1, Status: StatusOngoing}
+	if err := db.Create(&interview).Error; err != nil {
+		t.Fatalf("create interview: %v", err)
+	}
+	resume := models.Resume{UserID: 1, Name: "后端工程师简历", Scene: "manual"}
+	if err := db.Create(&resume).Error; err != nil {
+		t.Fatalf("create resume: %v", err)
+	}
+	content := `{"personal":{"name":"候选人"},"project":[{"name":"搜索平台","role":"负责人","description":"负责架构设计"}]}`
+	version := models.ResumeVersion{
+		ResumeID:     resume.ID,
+		VersionLabel: "v1.0",
+		Content:      content,
+	}
+	if err := db.Create(&version).Error; err != nil {
+		t.Fatalf("create resume version: %v", err)
+	}
+	if err := db.Model(&resume).Update("current_version_id", version.ID).Error; err != nil {
+		t.Fatalf("set current version: %v", err)
+	}
+
+	service := NewInterviewService(db, nil, nil, nil)
+	got, err := service.AttachResume(1, interview.ID, &AttachResumeInput{ResumeID: resume.ID})
+	if err != nil {
+		t.Fatalf("AttachResume() error = %v", err)
+	}
+	if got.ResumeSnapshot != content || got.ResumeName != resume.Name {
+		t.Fatalf("attached resume = %#v", got)
+	}
+
+	var persisted models.Interview
+	if err := db.First(&persisted, interview.ID).Error; err != nil {
+		t.Fatalf("reload interview: %v", err)
+	}
+	if persisted.ResumeSnapshot != content || persisted.ResumeName != resume.Name {
+		t.Fatalf("persisted resume snapshot/name = %q/%q", persisted.ResumeSnapshot, persisted.ResumeName)
+	}
+
+	if _, err := service.AttachResume(2, interview.ID, &AttachResumeInput{ResumeID: resume.ID}); !errors.Is(err, ErrInterviewNotFound) {
+		t.Fatalf("other user AttachResume() error = %v, want ErrInterviewNotFound", err)
+	}
+}
+
+func TestSummarizeResumeTruncatesPromptContent(t *testing.T) {
+	content := `{"custom":[{"title":"补充经历","content":"` +
+		strings.Repeat("项", maxResumePromptRunes+100) +
+		`"}]}`
+	summary := summarizeResume(content)
+	if !strings.HasSuffix(summary, "（简历内容已截断）") {
+		t.Fatalf("summary was not truncated")
+	}
+	if got := len([]rune(summary)); got > maxResumePromptRunes+20 {
+		t.Fatalf("summary rune count = %d", got)
 	}
 }

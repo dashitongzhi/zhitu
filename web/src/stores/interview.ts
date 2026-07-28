@@ -6,6 +6,7 @@ import type {
   InterviewReport,
   InterviewScore,
   CreateInterviewRequest,
+  AttachResumeRequest,
 } from '@/types/models'
 import * as interviewApi from '@/api/interview'
 import { message } from 'ant-design-vue'
@@ -65,6 +66,22 @@ export const useInterviewStore = defineStore('interview', () => {
       return i || null
     } catch (error) {
       console.error('创建面试失败:', error)
+      return null
+    }
+  }
+
+  // 在面试中发送简历（绑定简历版本快照，AI 后续提问会结合简历内容）
+  const attachResume = async (interviewId: number, data: AttachResumeRequest) => {
+    try {
+      const response = await interviewApi.attachResume(interviewId, data)
+      const updated = response.data.data
+      if (updated && currentInterview.value?.id === interviewId) {
+        currentInterview.value = updated
+      }
+      message.success('简历已发送，AI 将在后续提问中结合简历内容')
+      return updated || null
+    } catch (error) {
+      console.error('发送简历失败:', error)
       return null
     }
   }
@@ -281,6 +298,7 @@ export const useInterviewStore = defineStore('interview', () => {
     fetchList,
     fetchOne,
     create,
+    attachResume,
     sendMessage,
     sendVoice,
     playTts,
