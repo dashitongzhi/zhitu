@@ -160,6 +160,7 @@ export const useInterviewStore = defineStore('interview', () => {
   ) => {
     sending.value = true
     streamingText.value = ''
+    let succeeded = false
     // 乐观加入用户消息占位（语音转写中）
     const userMsg: InterviewMessage = {
       id: Date.now(),
@@ -191,12 +192,14 @@ export const useInterviewStore = defineStore('interview', () => {
             }
           },
           onDone: (data) => {
+            succeeded = true
             streamingText.value = ''
             if (data.message) {
               messages.value.push(data.message)
             }
           },
           onInterviewEnded: (data) => {
+            succeeded = true
             if (data.message) {
               messages.value.push(data.message)
             }
@@ -211,7 +214,14 @@ export const useInterviewStore = defineStore('interview', () => {
         },
         signal
       )
-      return true
+      if (succeeded) {
+        // 用服务端保存的转写内容替换本地占位，并同步面试完成状态。
+        await fetchOne(id)
+      } else {
+        const placeholderIndex = messages.value.findIndex((item) => item.id === userMsg.id)
+        if (placeholderIndex >= 0) messages.value.splice(placeholderIndex, 1)
+      }
+      return succeeded
     } catch (error) {
       console.error('发送语音失败:', error)
       return false

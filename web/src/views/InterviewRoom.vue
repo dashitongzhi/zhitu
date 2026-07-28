@@ -147,10 +147,52 @@
               <a-textarea
                 v-model:value="inputText"
                 :rows="3"
-                placeholder="输入你的回答..."
-                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing"
-                @keydown.enter.exact.prevent="handleSendText"
+                :placeholder="audioDraft ? '录音已作为音频文件加入，可转成文字后编辑' : '输入你的回答...'"
+                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !!audioDraft"
+                @keydown.enter.exact.prevent="handleSendAnswer"
               />
+              <div v-if="audioDraft" class="audio-draft-card">
+                <div class="audio-draft-main">
+                  <div class="audio-file-icon"><AudioOutlined /></div>
+                  <div class="audio-file-info">
+                    <strong>{{ audioDraft.file.name }}</strong>
+                    <span>
+                      WAV · {{ formatDuration(audioDraft.durationSeconds) }}
+                      · {{ formatFileSize(audioDraft.file.size) }}
+                    </span>
+                  </div>
+                  <audio :src="audioDraft.objectUrl" controls preload="metadata"></audio>
+                </div>
+                <div class="audio-draft-actions">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :loading="transcribingDraft"
+                    :disabled="interviewStore.sending"
+                    @click="handleTranscribeDraft"
+                  >
+                    转化为文本
+                  </a-button>
+                  <a-button
+                    type="link"
+                    size="small"
+                    :disabled="transcribingDraft || interviewStore.sending"
+                    @click="rerecordVoice"
+                  >
+                    重新录制
+                  </a-button>
+                  <a-button
+                    type="text"
+                    danger
+                    size="small"
+                    :disabled="transcribingDraft || interviewStore.sending"
+                    @click="clearAudioDraft"
+                  >
+                    删除
+                  </a-button>
+                  <small>可先转成文字并编辑，也可直接点击发送，由后台转写后继续分析。</small>
+                </div>
+              </div>
               <div class="input-toolbar">
                 <div class="toolbar-left">
                   <!-- 麦克风录音（mode 为 voice/hybrid 时可用） -->
@@ -158,14 +200,14 @@
                     v-if="canSendVoice"
                     :danger="isRecording"
                     :loading="voicePreparing || recordingFinalizing"
-                    :disabled="interviewStore.sending || voicePreparing || recordingFinalizing"
+                    :disabled="interviewStore.sending || voicePreparing || recordingFinalizing || !!audioDraft"
                     :class="{ 'recording-button': isRecording }"
                     @click="toggleVoiceRecording"
                   >
                     <AudioOutlined />
                     <span v-if="voicePreparing">正在获取麦克风</span>
-                    <span v-else-if="recordingFinalizing">正在发送录音</span>
-                    <span v-else-if="isRecording">结束并发送 {{ recordingTimeLabel }}</span>
+                    <span v-else-if="recordingFinalizing">正在生成录音</span>
+                    <span v-else-if="isRecording">结束录音 {{ recordingTimeLabel }}</span>
                     <span v-else>语音回答</span>
                   </a-button>
                   <!-- 发送简历：把简历绑定到本次面试，AI 后续提问会结合简历内容 -->
@@ -184,8 +226,8 @@
                   <a-button
                     type="primary"
                     :loading="interviewStore.sending"
-                    :disabled="!inputText.trim() || isRecording || voicePreparing || recordingFinalizing"
-                    @click="handleSendText"
+                    :disabled="(!inputText.trim() && !audioDraft) || isRecording || voicePreparing || recordingFinalizing || transcribingDraft"
+                    @click="handleSendAnswer"
                   >
                     <SendOutlined /> 发送
                   </a-button>
@@ -463,6 +505,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import { useInterviewStore } from '@/stores/interview'
+import { transcribeVoice } from '@/api/interview'
 import { listResumes, listVersions } from '@/api/resume'
 import type {
   InterviewScene,
@@ -493,15 +536,26 @@ const isRecording = ref(false)
 const voicePreparing = ref(false)
 const recordingFinalizing = ref(false)
 const recordingSeconds = ref(0)
+const transcribingDraft = ref(false)
+type AudioDraft = {
+  file: File
+  objectUrl: string
+  durationSeconds: number
+}
+const audioDraft = ref<AudioDraft | null>(null)
 const recordingTimeLabel = computed(() => {
   const minutes = Math.floor(recordingSeconds.value / 60)
   const seconds = recordingSeconds.value % 60
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 })
-let mediaRecorder: MediaRecorder | null = null
 let microphoneStream: MediaStream | null = null
 let recordingTimer: number | null = null
-let recordedChunks: Blob[] = []
+let audioContext: AudioContext | null = null
+let microphoneSource: MediaStreamAudioSourceNode | null = null
+let recordingProcessor: ScriptProcessorNode | null = null
+let silentGain: GainNode | null = null
+let recordedPCMChunks: Float32Array[] = []
+let recordingSampleRate = 44100
 let discardRecordedVoice = false
 
 // 加载状态
@@ -827,14 +881,22 @@ const confirmAttachResume = async () => {
   }
 }
 
-// 发送文字回答
-const handleSendText = async () => {
-  const content = inputText.value.trim()
-  if (!content) return
+// 发送文字回答或音频草稿
+const handleSendAnswer = async () => {
   if (!isOngoing.value) {
     message.warning('面试已结束，无法继续作答')
     return
   }
+
+  if (audioDraft.value) {
+    const draft = audioDraft.value
+    const sent = await interviewStore.sendVoice(interviewId.value, draft.file)
+    if (sent) clearAudioDraft()
+    return
+  }
+
+  const content = inputText.value.trim()
+  if (!content) return
   inputText.value = ''
   await interviewStore.sendMessage(interviewId.value, content)
 }
@@ -853,52 +915,140 @@ const releaseMicrophone = () => {
   microphoneStream = null
 }
 
-const recordingFileExtension = (mimeType: string) => {
-  if (mimeType.includes('mp4')) return 'm4a'
-  if (mimeType.includes('ogg')) return 'ogg'
-  return 'webm'
+const clearAudioDraft = () => {
+  if (audioDraft.value) {
+    URL.revokeObjectURL(audioDraft.value.objectUrl)
+    audioDraft.value = null
+  }
 }
 
-const finalizeVoiceRecording = async (recorder: MediaRecorder) => {
-  const shouldDiscard = discardRecordedVoice
-  const chunks = recordedChunks
-  recordedChunks = []
-  stopRecordingTimer()
+const teardownAudioGraph = async () => {
+  if (recordingProcessor) {
+    recordingProcessor.onaudioprocess = null
+    recordingProcessor.disconnect()
+    recordingProcessor = null
+  }
+  microphoneSource?.disconnect()
+  microphoneSource = null
+  silentGain?.disconnect()
+  silentGain = null
+  const context = audioContext
+  audioContext = null
+  if (context && context.state !== 'closed') {
+    await context.close()
+  }
   releaseMicrophone()
-  mediaRecorder = null
+}
+
+const mergePCMChunks = (chunks: Float32Array[]) => {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const merged = new Float32Array(totalLength)
+  let offset = 0
+  chunks.forEach((chunk) => {
+    merged.set(chunk, offset)
+    offset += chunk.length
+  })
+  return merged
+}
+
+const downsamplePCM = (
+  samples: Float32Array,
+  sourceRate: number,
+  targetRate: number
+) => {
+  if (sourceRate <= targetRate) return samples
+  const ratio = sourceRate / targetRate
+  const outputLength = Math.round(samples.length / ratio)
+  const output = new Float32Array(outputLength)
+  for (let i = 0; i < outputLength; i += 1) {
+    const start = Math.floor(i * ratio)
+    const end = Math.min(Math.floor((i + 1) * ratio), samples.length)
+    let sum = 0
+    for (let j = start; j < end; j += 1) sum += samples[j]
+    output[i] = sum / Math.max(1, end - start)
+  }
+  return output
+}
+
+const encodePCMAsWav = (samples: Float32Array, sampleRate: number) => {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+  const writeText = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  writeText(0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeText(8, 'WAVE')
+  writeText(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeText(36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  let offset = 44
+  samples.forEach((sample) => {
+    const clamped = Math.max(-1, Math.min(1, sample))
+    view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true)
+    offset += 2
+  })
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+const finalizeVoiceRecording = async () => {
+  const shouldDiscard = discardRecordedVoice
+  const chunks = recordedPCMChunks
+  const sourceRate = recordingSampleRate
+  recordedPCMChunks = []
+  stopRecordingTimer()
   isRecording.value = false
-  recordingSeconds.value = 0
+  recordingFinalizing.value = !shouldDiscard
+  await teardownAudioGraph()
 
   if (shouldDiscard) {
     discardRecordedVoice = false
     recordingFinalizing.value = false
+    recordingSeconds.value = 0
     return
   }
 
-  const mimeType = recorder.mimeType || chunks[0]?.type || 'audio/webm'
-  const audioBlob = new Blob(chunks, { type: mimeType })
-  if (audioBlob.size === 0) {
+  const pcm = mergePCMChunks(chunks)
+  const targetSampleRate = Math.min(sourceRate, 16000)
+  const normalizedPCM = downsamplePCM(pcm, sourceRate, targetSampleRate)
+  if (normalizedPCM.length === 0) {
     message.error('没有录到声音，请重新尝试')
     recordingFinalizing.value = false
+    recordingSeconds.value = 0
     return
   }
-  if (audioBlob.size > 25 * 1024 * 1024) {
-    message.error('录音不能超过 25MB')
+  const audioBlob = encodePCMAsWav(normalizedPCM, targetSampleRate)
+  if (audioBlob.size > 7 * 1024 * 1024) {
+    message.error('录音过长，请控制在约 3 分钟以内')
     recordingFinalizing.value = false
+    recordingSeconds.value = 0
     return
   }
 
-  recordingFinalizing.value = true
-  try {
-    const file = new File(
-      [audioBlob],
-      `voice-answer-${Date.now()}.${recordingFileExtension(mimeType)}`,
-      { type: mimeType }
-    )
-    await interviewStore.sendVoice(interviewId.value, file)
-  } finally {
-    recordingFinalizing.value = false
+  const file = new File(
+    [audioBlob],
+    `voice-answer-${Date.now()}.wav`,
+    { type: 'audio/wav' }
+  )
+  clearAudioDraft()
+  audioDraft.value = {
+    file,
+    objectUrl: URL.createObjectURL(file),
+    durationSeconds: normalizedPCM.length / targetSampleRate,
   }
+  recordingSeconds.value = 0
+  recordingFinalizing.value = false
 }
 
 const startVoiceRecording = async () => {
@@ -906,7 +1056,11 @@ const startVoiceRecording = async () => {
     message.warning('面试已结束，无法继续作答')
     return
   }
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+  const windowWithWebkitAudio = window as typeof window & {
+    webkitAudioContext?: typeof AudioContext
+  }
+  const AudioContextClass = window.AudioContext || windowWithWebkitAudio.webkitAudioContext
+  if (!navigator.mediaDevices?.getUserMedia || !AudioContextClass) {
     message.error('当前浏览器不支持麦克风录音，请使用最新版 Chrome、Edge 或 Safari')
     return
   }
@@ -915,50 +1069,43 @@ const startVoiceRecording = async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
+        channelCount: 1,
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       },
     })
     microphoneStream = stream
-    const preferredMimeTypes = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-    ]
-    const mimeType = preferredMimeTypes.find((type) =>
-      MediaRecorder.isTypeSupported(type)
-    )
-    const recorder = new MediaRecorder(
-      stream,
-      mimeType ? { mimeType } : undefined
-    )
+    const context = new AudioContextClass()
+    const source = context.createMediaStreamSource(stream)
+    const processor = context.createScriptProcessor(4096, 1, 1)
+    const gain = context.createGain()
+    gain.gain.value = 0
 
-    mediaRecorder = recorder
-    recordedChunks = []
+    audioContext = context
+    microphoneSource = source
+    recordingProcessor = processor
+    silentGain = gain
+    recordingSampleRate = context.sampleRate
+    recordedPCMChunks = []
     discardRecordedVoice = false
 
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordedChunks.push(event.data)
+    processor.onaudioprocess = (event) => {
+      if (!isRecording.value) return
+      recordedPCMChunks.push(new Float32Array(event.inputBuffer.getChannelData(0)))
     }
-    recorder.onerror = () => {
-      message.error('录音过程中发生错误，请重新尝试')
-      discardRecordedVoice = true
-      if (recorder.state !== 'inactive') recorder.stop()
-    }
-    recorder.onstop = () => {
-      void finalizeVoiceRecording(recorder)
-    }
+    source.connect(processor)
+    processor.connect(gain)
+    gain.connect(context.destination)
+    await context.resume()
 
-    recorder.start(250)
     isRecording.value = true
     recordingSeconds.value = 0
     recordingTimer = window.setInterval(() => {
       recordingSeconds.value += 1
     }, 1000)
   } catch (error) {
-    releaseMicrophone()
+    await teardownAudioGraph()
     if (error instanceof DOMException && error.name === 'NotAllowedError') {
       message.error('未获得麦克风权限，请在浏览器地址栏允许访问麦克风')
     } else if (error instanceof DOMException && error.name === 'NotFoundError') {
@@ -972,11 +1119,8 @@ const startVoiceRecording = async () => {
 }
 
 const stopVoiceRecording = () => {
-  if (!mediaRecorder || mediaRecorder.state === 'inactive') return
-  isRecording.value = false
-  recordingFinalizing.value = true
-  stopRecordingTimer()
-  mediaRecorder.stop()
+  if (!isRecording.value) return
+  void finalizeVoiceRecording()
 }
 
 const toggleVoiceRecording = async () => {
@@ -990,12 +1134,49 @@ const toggleVoiceRecording = async () => {
 const discardVoiceRecording = () => {
   discardRecordedVoice = true
   stopRecordingTimer()
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
+  if (isRecording.value) {
+    void finalizeVoiceRecording()
   } else {
-    releaseMicrophone()
+    void teardownAudioGraph()
   }
   isRecording.value = false
+}
+
+const formatDuration = (seconds: number) => {
+  const rounded = Math.max(0, Math.round(seconds))
+  const minutes = Math.floor(rounded / 60)
+  return `${String(minutes).padStart(2, '0')}:${String(rounded % 60).padStart(2, '0')}`
+}
+
+const formatFileSize = (size: number) => {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+const handleTranscribeDraft = async () => {
+  const draft = audioDraft.value
+  if (!draft || transcribingDraft.value) return
+  transcribingDraft.value = true
+  try {
+    const response = await transcribeVoice(interviewId.value, draft.file)
+    const text = response.data.data?.text?.trim()
+    if (!text) {
+      message.error('未识别到有效文字，请重新录制')
+      return
+    }
+    clearAudioDraft()
+    inputText.value = text
+    message.success('已转化为文本，可编辑后发送')
+  } catch (error) {
+    console.error('语音转文字失败:', error)
+  } finally {
+    transcribingDraft.value = false
+  }
+}
+
+const rerecordVoice = async () => {
+  clearAudioDraft()
+  await startVoiceRecording()
 }
 
 // TTS 播放
@@ -1061,6 +1242,7 @@ const handlePlayTts = (msg: InterviewMessage) => {
 
 onBeforeUnmount(() => {
   discardVoiceRecording()
+  clearAudioDraft()
   stopTtsPlayback()
 })
 
@@ -1434,6 +1616,70 @@ onMounted(async () => {
   background: #fff;
 }
 
+.audio-draft-card {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #d9e7ff;
+  border-radius: 8px;
+  background: #f7faff;
+}
+
+.audio-draft-main {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) minmax(180px, 260px);
+  align-items: center;
+  gap: 12px;
+}
+
+.audio-file-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #1677ff;
+  background: #e6f4ff;
+  font-size: 18px;
+}
+
+.audio-file-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.audio-file-info strong {
+  overflow: hidden;
+  color: #1f1f1f;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-file-info span {
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.audio-draft-main audio {
+  width: 100%;
+  height: 36px;
+}
+
+.audio-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.audio-draft-actions small {
+  margin-left: auto;
+  color: #8c8c8c;
+  font-size: 11px;
+}
+
 .input-toolbar {
   display: flex;
   align-items: center;
@@ -1516,6 +1762,31 @@ onMounted(async () => {
 
 .recording-button {
   box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.12);
+}
+
+@media (max-width: 900px) {
+  .audio-draft-main {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .audio-draft-main audio {
+    grid-column: 1 / -1;
+  }
+
+  .audio-draft-actions {
+    flex-wrap: wrap;
+  }
+
+  .audio-draft-actions small {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .input-toolbar,
+  .toolbar-left {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 .resume-block-info {

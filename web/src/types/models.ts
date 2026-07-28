@@ -430,7 +430,7 @@ export type SSEEventType =
 export interface SSEEvent {
   type: SSEEventType
   content?: string
-  message?: string
+  message?: string | InterviewMessage
   interview?: Interview
   version?: ResumeVersion
 }

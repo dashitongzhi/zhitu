@@ -69,6 +69,20 @@ export const sendVoice = (
   )
 }
 
+// 仅转写语音草稿，不创建回答消息、不推进面试
+export const transcribeVoice = (interviewId: number, audio: File) => {
+  const formData = new FormData()
+  formData.append('audio', audio)
+  return post<ApiResponse<{ text: string }>>(
+    `/api/v1/interviews/${interviewId}/transcribe`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000,
+    }
+  )
+}
+
 // 获取 AI 提问的 TTS 音频（返回二进制 Blob）
 export const getTtsAudio = (interviewId: number, msgId: number) => {
   return get<Blob>(
