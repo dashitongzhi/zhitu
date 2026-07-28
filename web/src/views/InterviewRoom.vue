@@ -111,10 +111,10 @@
                       v-if="canPlayTts && msg.role === 'assistant'"
                       type="link"
                       size="small"
-                      :loading="ttsLoadingId === msg.id"
-                      @click="handlePlayTts(msg.id)"
+                      @click="handlePlayTts(msg)"
                     >
-                      <SoundOutlined /> 播放
+                      <SoundOutlined />
+                      {{ speakingMessageId === msg.id ? '停止' : '播放' }}
                     </a-button>
                   </div>
                   <div class="msg-bubble">
@@ -371,9 +371,6 @@
       </a-row>
     </a-spin>
 
-    <!-- 隐藏的 audio 元素用于 TTS 播放 -->
-    <audio ref="audioPlayer" class="hidden-audio" />
-
     <!-- 发送简历弹窗：选择简历 + 版本 -->
     <a-modal
       v-model:open="resumeModalVisible"
@@ -473,6 +470,7 @@ import type {
   InterviewDifficulty,
   InterviewStatus,
   InterviewDimension,
+  InterviewMessage,
   Resume,
   ResumeVersion,
 } from '@/types/models'
@@ -488,7 +486,6 @@ const interviewId = computed(() => Number(route.params.id))
 // 输入与界面状态
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const audioPlayer = ref<HTMLAudioElement | null>(null)
 const sideTab = ref<'info' | 'report' | 'scores'>('info')
 
 // 麦克风录音状态
@@ -510,7 +507,8 @@ let discardRecordedVoice = false
 // 加载状态
 const reportLoading = ref(false)
 const scoresLoading = ref(false)
-const ttsLoadingId = ref<number | null>(null)
+const speakingMessageId = ref<number | null>(null)
+let speechUtterance: SpeechSynthesisUtterance | null = null
 
 // 发送简历相关状态
 const resumeModalVisible = ref(false)
@@ -1000,30 +998,71 @@ const discardVoiceRecording = () => {
   isRecording.value = false
 }
 
-onBeforeUnmount(discardVoiceRecording)
-
 // TTS 播放
-const handlePlayTts = async (msgId: number) => {
-  if (ttsLoadingId.value !== null) return
-  ttsLoadingId.value = msgId
-  try {
-    const url = await interviewStore.playTts(interviewId.value, msgId)
-    if (url && audioPlayer.value) {
-      // 如果有旧的 URL，先释放
-      const oldSrc = audioPlayer.value.src
-      if (oldSrc && oldSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(oldSrc)
-      }
-      audioPlayer.value.src = url
-      audioPlayer.value.onended = () => {
-        if (url.startsWith('blob:')) URL.revokeObjectURL(url)
-      }
-      await audioPlayer.value.play()
-    }
-  } finally {
-    ttsLoadingId.value = null
+const stopTtsPlayback = () => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
   }
+  speechUtterance = null
+  speakingMessageId.value = null
 }
+
+const handlePlayTts = (msg: InterviewMessage) => {
+  if (speakingMessageId.value === msg.id) {
+    stopTtsPlayback()
+    return
+  }
+  if (
+    typeof window === 'undefined' ||
+    !('speechSynthesis' in window) ||
+    typeof SpeechSynthesisUtterance === 'undefined'
+  ) {
+    message.error('当前浏览器不支持语音朗读，请使用最新版 Chrome、Edge 或 Safari')
+    return
+  }
+
+  const text = msg.content.trim()
+  if (!text) {
+    message.warning('当前问题没有可朗读的内容')
+    return
+  }
+
+  stopTtsPlayback()
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'zh-CN'
+  utterance.rate = 0.95
+  utterance.pitch = 1
+  utterance.volume = 1
+
+  const voices = window.speechSynthesis.getVoices()
+  utterance.voice =
+    voices.find((voice) => voice.lang.toLowerCase() === 'zh-cn') ||
+    voices.find((voice) => voice.lang.toLowerCase().startsWith('zh')) ||
+    null
+
+  const resetPlaybackState = () => {
+    if (speechUtterance !== utterance) return
+    speechUtterance = null
+    speakingMessageId.value = null
+  }
+  utterance.onend = resetPlaybackState
+  utterance.onerror = (event) => {
+    resetPlaybackState()
+    if (event.error !== 'canceled' && event.error !== 'interrupted') {
+      message.error('语音朗读失败，请稍后重试')
+    }
+  }
+
+  speechUtterance = utterance
+  speakingMessageId.value = msg.id
+  window.speechSynthesis.speak(utterance)
+}
+
+onBeforeUnmount(() => {
+  discardVoiceRecording()
+  stopTtsPlayback()
+})
 
 // 结束面试
 const handleEndInterview = () => {
