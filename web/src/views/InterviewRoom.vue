@@ -327,6 +327,46 @@
                       {{ interviewStore.report.summary }}
                     </a-typography-paragraph>
 
+                    <div class="block-title">逐题详细复盘</div>
+                    <div
+                      v-if="questionFeedbackItems.length"
+                      class="question-feedback-list"
+                    >
+                      <article
+                        v-for="item in questionFeedbackItems"
+                        :key="item.question_no"
+                        class="question-feedback-card"
+                      >
+                        <header>
+                          <strong>第 {{ item.question_no }} 题</strong>
+                          <a-tag :color="scoreTagColor(item.score)">
+                            {{ item.score }} 分
+                          </a-tag>
+                        </header>
+                        <div class="feedback-section">
+                          <span>面试题</span>
+                          <p>{{ item.question || '未记录题目文本' }}</p>
+                        </div>
+                        <div class="feedback-section">
+                          <span>你的回答</span>
+                          <p>{{ item.answer || '未记录回答文本' }}</p>
+                        </div>
+                        <div class="feedback-section">
+                          <span>本题评价</span>
+                          <p>{{ item.comment || '暂无详细评价' }}</p>
+                        </div>
+                        <div class="feedback-section suggestion">
+                          <span>优化方向</span>
+                          <p>{{ item.suggestion || '暂无优化建议' }}</p>
+                        </div>
+                      </article>
+                    </div>
+                    <a-empty
+                      v-else
+                      description="暂无逐题评价"
+                      :image="simpleImage"
+                    />
+
                     <div class="block-title">亮点</div>
                     <a-list
                       v-if="parseJsonArray(interviewStore.report.highlights).length"
@@ -514,6 +554,7 @@ import type {
   InterviewStatus,
   InterviewDimension,
   InterviewMessage,
+  QuestionFeedbackItem,
   Resume,
   ResumeVersion,
 } from '@/types/models'
@@ -767,6 +808,40 @@ const parseJsonArray = (str: string | null | undefined): string[] => {
     return str.split('\n').filter((s) => s.trim())
   }
 }
+
+const parseQuestionFeedback = (
+  value: string | null | undefined
+): QuestionFeedbackItem[] => {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item, index) => {
+        const rawScore = Number(item?.score)
+        return {
+          question_no: Number(item?.question_no) || index + 1,
+          question: String(item?.question || '').trim(),
+          answer: String(item?.answer || '').trim(),
+          score: Number.isFinite(rawScore)
+            ? Math.max(0, Math.min(100, Math.round(rawScore)))
+            : 0,
+          comment: String(item?.comment || '').trim(),
+          suggestion: String(item?.suggestion || '').trim(),
+        }
+      })
+      .filter((item) =>
+        Boolean(item.question || item.answer || item.comment || item.suggestion)
+      )
+      .sort((a, b) => a.question_no - b.question_no)
+  } catch {
+    return []
+  }
+}
+
+const questionFeedbackItems = computed(() =>
+  parseQuestionFeedback(interviewStore.report?.question_feedback)
+)
 
 // 时间格式化
 const formatTime = (dateStr: string | null | undefined): string => {
@@ -1750,6 +1825,67 @@ onMounted(async () => {
   padding: 16px;
   background: #fafafa;
   border-radius: 6px;
+}
+
+.question-feedback-list {
+  display: grid;
+  gap: 12px;
+}
+
+.question-feedback-card {
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.question-feedback-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.question-feedback-card header strong {
+  color: #1f1f1f;
+  font-size: 14px;
+}
+
+.feedback-section {
+  padding: 10px 12px 0;
+}
+
+.feedback-section:last-child {
+  padding-bottom: 12px;
+}
+
+.feedback-section span {
+  display: block;
+  margin-bottom: 4px;
+  color: #8c8c8c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.feedback-section p {
+  margin: 0;
+  color: #434343;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.feedback-section.suggestion {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e8e8e8;
+  background: #f6ffed;
+}
+
+.feedback-section.suggestion span {
+  color: #389e0d;
 }
 
 .list-item-text {
