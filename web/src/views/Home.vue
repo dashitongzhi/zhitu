@@ -72,27 +72,26 @@
             打开简历实验室 <ArrowRightOutlined />
           </button>
         </div>
-        <div class="document-study" aria-label="简历分析示意">
-          <div class="paper-sheet">
-            <div class="paper-heading">
-              <span class="paper-avatar">W</span>
-              <div><strong>产品设计师</strong><small>目标岗位版本 · 07</small></div>
-            </div>
-            <div class="paper-rule"></div>
-            <div class="paper-block wide"></div>
-            <div class="paper-block mid"></div>
-            <div class="paper-block short"></div>
-            <div class="paper-note">把“负责设计”改成具体的结果与影响</div>
-            <div class="paper-block wide"></div>
-            <div class="paper-block mid"></div>
+        <figure class="resume-story" aria-label="求职者根据真实经历修改纸质简历">
+          <img
+            class="resume-story-main"
+            :src="resumePersonalImage"
+            alt="一位求职者在家中书桌前逐条修改自己的纸质简历"
+            loading="lazy"
+          />
+          <div class="resume-story-detail">
+            <img
+              :src="resumeDetailImage"
+              alt="纸质简历上的手写圈画和经历批注"
+              loading="lazy"
+            />
+            <span>真实材料，不是标准答案</span>
           </div>
-          <div class="margin-note">
-            <span>匹配重点</span>
-            <strong>研究能力</strong>
-            <strong>跨团队协作</strong>
-            <strong>业务结果</strong>
-          </div>
-        </div>
+          <figcaption>
+            <span>一条经历，一处处说清楚</span>
+            <strong>从你做过的事开始，而不是从漂亮话开始。</strong>
+          </figcaption>
+        </figure>
       </section>
 
       <section id="tools" class="photo-story">
@@ -227,6 +226,8 @@ import { useAuthStore } from '@/stores/auth'
 import heroImage from '@/assets/home-editorial/hero-career-desk.webp'
 import interviewImage from '@/assets/home-editorial/interview-practice.webp'
 import workspaceImage from '@/assets/home-editorial/application-workspace.webp'
+import resumePersonalImage from '@/assets/home-editorial/resume-personal-edit.webp'
+import resumeDetailImage from '@/assets/home-editorial/resume-markup-detail.webp'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -397,18 +398,15 @@ h2 { margin: 0; font-size: clamp(40px, 4vw, 64px); line-height: 1.12; letter-spa
 .plain-list :deep(svg) { color: var(--blue); }
 .inline-link { display: inline-flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 0; font-weight: 700; transition: gap 0.2s ease, color 0.2s ease; }
 .inline-link:hover { color: var(--blue); gap: 16px; }
-.document-study { position: relative; min-height: 610px; padding: 56px 72px 56px 36px; background: #dfe4ea; }
-.paper-sheet { position: relative; width: min(430px, 82%); min-height: 500px; margin: 0 auto; padding: 48px 44px; background: white; box-shadow: 0 28px 70px rgba(54, 63, 76, .18); transform: rotate(-1.5deg); }
-.paper-heading { display: flex; gap: 14px; align-items: center; }
-.paper-heading div { display: flex; flex-direction: column; gap: 3px; }
-.paper-heading small { color: #808793; }
-.paper-avatar { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: #e8eefc; color: var(--blue); font-weight: 800; }
-.paper-rule { height: 1px; margin: 28px 0 34px; background: linear-gradient(90deg, rgba(21,26,35,0), rgba(21,26,35,0.2) 50%, rgba(21,26,35,0)); }
-.paper-block { height: 7px; margin: 18px 0; background: #cfd4db; }
-.paper-block.wide { width: 100%; }.paper-block.mid { width: 74%; }.paper-block.short { width: 45%; }
-.paper-note { margin: 34px -12px; padding: 16px 18px; border-left: 0; border-radius: 8px; background: #edf2ff; color: #315089; font-size: 13px; line-height: 1.6; }
-.margin-note { position: absolute; top: 76px; right: 24px; width: 150px; padding: 18px; background: var(--blue); color: white; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 18px 40px rgba(23,87,210,.24); }
-.margin-note span { color: #cddcff; font-size: 11px; letter-spacing: .12em; }.margin-note strong { font-size: 13px; }
+.resume-story { position: relative; min-width: 0; min-height: 650px; margin: 0; overflow: hidden; background: #dfe4ea; }
+.resume-story-main { width: 100%; height: 650px; display: block; object-fit: cover; object-position: 45% center; filter: saturate(.82) contrast(.97); }
+.resume-story::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 58%, rgba(17,24,34,.52) 100%); }
+.resume-story-detail { position: absolute; z-index: 2; top: 30px; right: 30px; width: min(240px, 34%); padding: 8px 8px 12px; background: rgba(249,249,246,.94); box-shadow: 0 18px 42px rgba(26,33,43,.2); transform: rotate(2deg); }
+.resume-story-detail img { width: 100%; aspect-ratio: 4 / 3; display: block; object-fit: cover; }
+.resume-story-detail span { display: block; padding: 10px 5px 0; color: #58606b; font-size: 11px; letter-spacing: .05em; }
+.resume-story figcaption { position: absolute; z-index: 2; left: 30px; right: 30px; bottom: 26px; display: flex; align-items: end; justify-content: space-between; gap: 28px; color: white; }
+.resume-story figcaption span { flex: 0 0 auto; font-size: 11px; letter-spacing: .12em; }
+.resume-story figcaption strong { max-width: 370px; font-size: 17px; line-height: 1.55; text-align: right; font-weight: 600; }
 .photo-story { display: grid; grid-template-columns: 1.2fr .8fr; min-height: 920px; background: #171d27; color: white; }
 .photo-story figure { min-width: 0; margin: 0; position: relative; overflow: hidden; }
 .photo-story figure img { width: 100%; height: 100%; min-height: 920px; display: block; object-fit: cover; object-position: center; }
@@ -463,7 +461,7 @@ h2 { margin: 0; font-size: clamp(40px, 4vw, 64px); line-height: 1.12; letter-spa
   .site-header { width: 100%; grid-template-columns: 1fr auto; }.site-nav { display: none; }
   .hero-section { width: 100%; min-height: 680px; padding-top: 64px; }.hero-background { background-position: 64% center; opacity: .2; }.hero-wash { background: linear-gradient(90deg, rgba(246,247,244,.98) 0%, rgba(246,247,244,.88) 58%, rgba(246,247,244,.4) 100%); }
   .proof-strip { width: calc(100% - 40px); grid-template-columns: 1fr 1fr; }.proof-intro { padding: 28px 0; }.proof-item { border-top: 0; padding-top: 20px; }
-  .story-section { grid-template-columns: 45px 1fr; }.document-study { grid-column: 2; }
+  .story-section { grid-template-columns: 45px 1fr; }.resume-story { grid-column: 2; }
   .photo-story { grid-template-columns: 1fr; }.photo-story figure img { min-height: 620px; }.photo-story-copy { padding: 80px 40px; }
   .tracker-section, .steps-section { grid-template-columns: 1fr; }.workspace-figure { height: 580px; }.voices-grid { grid-template-columns: 1fr; }.voice-card { min-height: 280px; border-right: 0; border-bottom: 0; }.steps-heading { position: static; }
   .final-cta { align-items: flex-start; flex-direction: column; }.site-footer { grid-template-columns: 1fr; padding-top: 46px; padding-bottom: 46px; }
@@ -472,7 +470,7 @@ h2 { margin: 0; font-size: clamp(40px, 4vw, 64px); line-height: 1.12; letter-spa
   .site-header { width: 100%; height: 72px; padding-inline: 16px; }.wordmark { font-size: 18px; }.header-actions .text-button { display: none; }.solid-button.compact { min-height: 38px; padding: 0 12px; }
   .hero-section { width: 100%; min-height: 680px; margin-top: 0; padding: 54px 22px 120px; }.hero-background { background-position: 66% center; opacity: .16; }.hero-wash { background: linear-gradient(90deg, rgba(246,247,244,.97), rgba(246,247,244,.72)); }h1 { font-size: 44px; }.hero-lead { font-size: 16px; }.hero-actions { flex-direction: column; align-items: stretch; }.hero-caption { left: 22px; right: 22px; bottom: 28px; width: auto; }
   .proof-strip { width: calc(100% - 32px); display: block; }.proof-intro { max-width: none; }.proof-item { padding: 24px 0; border-left: 0; }
-  .editorial-section { width: calc(100% - 32px); padding: 90px 0; }.story-section { display: block; }.story-section > .section-number { margin-bottom: 50px; }.document-study { min-height: 500px; margin-top: 50px; padding: 44px 30px; }.paper-sheet { width: 100%; min-height: 420px; padding: 36px 28px; }.margin-note { right: 8px; top: auto; bottom: 30px; }
+  .editorial-section { width: calc(100% - 32px); padding: 90px 0; }.story-section { display: block; }.story-section > .section-number { margin-bottom: 50px; }.resume-story { min-height: 500px; margin-top: 50px; }.resume-story-main { height: 500px; }.resume-story-detail { top: 16px; right: 16px; width: 38%; }.resume-story figcaption { left: 18px; right: 18px; bottom: 18px; display: block; }.resume-story figcaption strong { display: block; margin-top: 8px; text-align: left; }
   .photo-story figure img { min-height: 0; height: 470px; }.photo-story-copy { padding: 70px 24px; }.photo-story-copy .section-number { margin-bottom: 50px; }
   .tracker-section { gap: 56px; }.tracker-copy .section-number { margin-bottom: 50px; }.tracker-flow { grid-template-columns: 1fr; gap: 8px; }.tracker-flow i { width: 1px; height: 14px; margin-left: 18px; }.workspace-figure { height: 500px; }
   .voices-section { padding: 90px 24px; }.voices-heading { display: block; margin-bottom: 50px; }.voices-heading .eyebrow { margin-bottom: 24px; }.voice-card { padding-left: 0; padding-right: 0; }
