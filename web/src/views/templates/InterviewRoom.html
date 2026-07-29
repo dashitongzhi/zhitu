@@ -116,9 +116,7 @@
                       {{ speakingMessageId === msg.id ? '停止' : '播放' }}
                     </a-button>
                   </div>
-                  <div class="msg-bubble">
-                    {{ msg.content }}
-                  </div>
+                  <div class="msg-bubble" v-html="renderMessageContent(msg.content)"></div>
                   <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
                 </div>
               </div>
@@ -134,7 +132,7 @@
                     <a-spin :spinning="interviewStore.sending" size="small" />
                   </div>
                   <div class="msg-bubble streaming-bubble">
-                    {{ interviewStore.streamingText }}
+                    <span v-html="renderMessageContent(interviewStore.streamingText)"></span>
                     <span class="cursor-blink">|</span>
                   </div>
                 </div>

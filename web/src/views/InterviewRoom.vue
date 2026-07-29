@@ -38,6 +38,27 @@ const interviewStore = useInterviewStore()
 
 const simpleImage = Empty.PRESENTED_IMAGE_SIMPLE
 
+const escapeMessageHtml = (content: string): string =>
+  content.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[character]
+  })
+
+const plainMessageContent = (content: string): string =>
+  content.replace(/\*\*([\s\S]*?)\*\*/g, '$1').replace(/\*\*/g, '')
+
+const renderMessageContent = (content: string): string =>
+  escapeMessageHtml(content)
+    .replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\*/g, '')
+    .replace(/\r?\n/g, '<br>')
+
 const interviewId = computed(() => Number(route.params.id))
 
 // 输入与界面状态
@@ -109,7 +130,8 @@ const canPlayTts = computed(() => {
 const isTeachingScene = computed(() => interviewStore.currentInterview?.scene === 'teaching')
 const latestQuestion = computed(() => {
   const assistantMessages = interviewStore.messages.filter((item) => item.role === 'assistant')
-  return assistantMessages[assistantMessages.length - 1]?.content || '考官正在准备第一道结构化问题…'
+  const content = assistantMessages[assistantMessages.length - 1]?.content
+  return content ? plainMessageContent(content) : '考官正在准备第一道结构化问题…'
 })
 const currentTeachingPhase = computed(() => {
   const no = interviewStore.currentInterview?.current_question_no || 1
@@ -756,7 +778,7 @@ const handlePlayTts = (msg: InterviewMessage) => {
     return
   }
 
-  const text = msg.content.trim()
+  const text = plainMessageContent(msg.content).trim()
   if (!text) {
     message.warning('当前问题没有可朗读的内容')
     return
