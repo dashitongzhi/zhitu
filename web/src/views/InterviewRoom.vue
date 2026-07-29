@@ -446,7 +446,13 @@ const handleSendAnswer = async () => {
   const content = inputText.value.trim()
   if (!content) return
   inputText.value = ''
-  await interviewStore.sendMessage(interviewId.value, content)
+  // 等待 DOM 更新完成，避免 a-textarea 在 disabled 状态变化时把旧值同步回 inputText
+  await nextTick()
+  try {
+    await interviewStore.sendMessage(interviewId.value, content)
+  } finally {
+    inputText.value = ''
+  }
 }
 
 // ============ 麦克风录音回答 ============

@@ -344,7 +344,8 @@ button { font: inherit; }
   width: 100%;
   height: 84px;
   margin: 0 auto;
-  padding-inline: max(clamp(28px, 5vw, 76px), calc((100vw - 1440px) / 2 + 76px));
+  /* 不再以 1440px 容器为界无限扩大留白，任何屏幕都贴近浏览器边框 */
+  padding-inline: clamp(20px, 3vw, 48px);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -366,7 +367,7 @@ button { font: inherit; }
 .solid-button:hover { background: #0d47bb; }
 .solid-button:active, .line-button:active { transform: translateY(1px); }
 .solid-button.compact { min-height: 42px; padding: 0 18px; font-size: 14px; }
-.hero-section { position: relative; isolation: isolate; width: 100%; min-height: calc(100vh - 84px); margin: 0 auto; display: flex; align-items: center; overflow: hidden; padding-block: 74px 112px; padding-inline: max(clamp(28px, 5vw, 76px), calc((100vw - 1440px) / 2 + 76px)); background: #f2f3f0; }
+.hero-section { position: relative; isolation: isolate; width: 100%; min-height: calc(100vh - 84px); margin: 0 auto; display: flex; align-items: center; overflow: hidden; padding-block: 74px 112px; padding-inline: clamp(20px, 3vw, 48px); background: #f2f3f0; }
 .hero-background { position: absolute; z-index: -3; inset: 0; background-position: 58% center; background-size: cover; filter: grayscale(.15) saturate(.55) contrast(.9); opacity: .24; transform: scale(1.01); }
 .hero-wash { position: absolute; z-index: -2; inset: 0; background: linear-gradient(90deg, rgba(246,247,244,.99) 0%, rgba(246,247,244,.93) 42%, rgba(246,247,244,.48) 66%, rgba(246,247,244,.18) 100%); }
 .hero-pattern { position: absolute; z-index: -1; left: 0; right: 0; bottom: 0; height: 30%; opacity: .36; background-color: rgba(255,255,255,.68); background-image: repeating-linear-gradient(12deg, transparent 0 14px, rgba(84,95,110,.14) 14px 15px, transparent 15px 28px); clip-path: polygon(0 52%, 62% 14%, 100% 0, 100% 100%, 0 100%); }
@@ -378,16 +379,16 @@ h1 em { color: var(--blue); font-style: normal; }
 .hero-actions { display: flex; gap: 14px; margin-top: 36px; }
 .line-button { min-height: 52px; padding: 0 22px; border: 1px solid transparent; background: rgba(21,26,35,0.04); font-weight: 650; transition: background 0.2s ease; }
 .line-button:hover { background: rgba(21,26,35,0.08); }
-.hero-caption { position: absolute; right: max(clamp(28px, 5vw, 76px), calc((100vw - 1440px) / 2 + 76px)); bottom: 38px; width: min(280px, 28%); padding-top: 14px; color: #313844; }
+.hero-caption { position: absolute; right: clamp(20px, 3vw, 48px); bottom: 38px; width: min(280px, 28%); padding-top: 14px; color: #313844; }
 .hero-caption::before { content: ''; position: absolute; left: 0; right: 30%; top: 0; height: 2px; background: linear-gradient(90deg, rgba(21,26,35,.72), rgba(21,26,35,0)); border-radius: 2px; }
 .hero-caption span { color: #697280; font-size: 11px; letter-spacing: .08em; }
 .hero-caption p { margin: 8px 0 0; font-size: 13px; line-height: 1.55; }
-.proof-strip { width: min(1440px, calc(100% - 64px)); margin: 0 auto; min-height: 150px; border-top: 0; border-bottom: 0; display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); align-items: stretch; }
+.proof-strip { width: 100%; margin: 0 auto; padding-inline: clamp(20px, 3vw, 48px); min-height: 150px; border-top: 0; border-bottom: 0; display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); align-items: stretch; }
 .proof-intro { display: flex; align-items: center; margin: 0; max-width: 240px; font-size: 18px; line-height: 1.5; font-weight: 650; }
 .proof-item { padding: 34px 34px 34px 48px; border-left: 0; display: flex; flex-direction: column; justify-content: center; }
 .proof-item strong { font-size: 34px; letter-spacing: -.04em; }
 .proof-item span { margin-top: 6px; color: var(--muted); font-size: 13px; }
-.editorial-section { width: min(1220px, calc(100% - 64px)); margin: 0 auto; padding: 200px 0; }
+.editorial-section { width: 100%; margin: 0 auto; padding: 200px clamp(20px, 3vw, 48px); }
 .story-section { display: grid; grid-template-columns: 70px .9fr 1.1fr; gap: clamp(28px, 5vw, 78px); align-items: center; }
 .section-number { align-self: start; color: #9ca3ad; font-size: 13px; letter-spacing: .1em; }
 h2 { margin: 0; font-size: clamp(40px, 4vw, 64px); line-height: 1.12; letter-spacing: -.055em; font-weight: 710; }
