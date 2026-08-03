@@ -480,6 +480,14 @@ const handleSendAnswer = async () => {
   }
 }
 
+// 中文、日文等输入法确认候选词时也会触发 Enter。
+// 组合输入期间必须交给 IME 处理，只有普通 Enter 才发送回答。
+const handleAnswerKeydown = (event: KeyboardEvent) => {
+  if (event.isComposing || event.keyCode === 229) return
+  event.preventDefault()
+  void handleSendAnswer()
+}
+
 // ============ 麦克风录音回答 ============
 
 const stopRecordingTimer = () => {

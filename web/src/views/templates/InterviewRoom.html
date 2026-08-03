@@ -148,7 +148,7 @@
                 :rows="3"
                 :placeholder="audioDraft ? '录音已作为音频文件加入，可转成文字后编辑' : '输入你的回答...'"
                 :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !!audioDraft"
-                @keydown.enter.exact.prevent="handleSendAnswer"
+                @keydown.enter.exact="handleAnswerKeydown"
               />
               <div v-if="audioDraft" class="audio-draft-card">
                 <div class="audio-draft-main">
