@@ -41,7 +41,7 @@
             <span>{{ taskLabel(session.task) }}</span>
             <small>{{ formatTime(session.updated_at) }}</small>
           </button>
-          <a-empty v-if="!copilotStore.sessions.length" :image="null" description="还没有对话记录" />
+          <a-empty v-if="!copilotStore.sessions.length" :image="false" description="还没有对话记录" />
         </section>
       </aside>
 
