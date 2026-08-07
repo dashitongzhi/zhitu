@@ -2,11 +2,41 @@
   <div class="copilot-page">
     <header class="copilot-header page-header">
       <div class="page-title-group">
-        <h1 class="page-title">求职 Copilot</h1>
+        <div class="page-title-line">
+          <h1 class="page-title">求职 Copilot</h1>
+          <a-button class="history-toggle" type="text" @click="showHistory = true">
+            <HistoryOutlined />
+            <span>历史记录</span>
+            <small v-if="copilotStore.sessions.length">{{ copilotStore.sessions.length }}</small>
+          </a-button>
+        </div>
         <p class="page-desc subtitle">围绕你的真实简历和目标岗位，分析差距、打磨项目、预测面试。</p>
       </div>
       <a-button class="clear-button" @click="clearLocalSessions">清除对话记录</a-button>
     </header>
+
+    <a-drawer
+      v-model:open="showHistory"
+      title="对话记录"
+      placement="right"
+      :width="340"
+      class="copilot-history-drawer"
+    >
+      <div class="history-list">
+        <button
+          v-for="session in copilotStore.sessions"
+          :key="session.id"
+          type="button"
+          class="history-item"
+          :class="{ active: session.id === copilotStore.activeSessionId }"
+          @click="selectExistingSession(session.id); showHistory = false"
+        >
+          <span>{{ taskLabel(session.task) }}</span>
+          <small>{{ formatTime(session.updated_at) }}</small>
+        </button>
+        <a-empty v-if="!copilotStore.sessions.length" :image="false" description="还没有对话记录" />
+      </div>
+    </a-drawer>
 
     <div class="copilot-layout">
       <aside class="copilot-sidebar">
@@ -32,15 +62,6 @@
             <component :is="item.icon" />
             <span><strong>{{ item.title }}</strong><small>{{ item.description }}</small></span>
           </button>
-        </section>
-
-        <section class="history-panel">
-          <div class="panel-title"><span>对话记录</span><small>{{ copilotStore.sessions.length }} 个</small></div>
-          <button v-for="session in copilotStore.sessions" :key="session.id" type="button" class="history-item" :class="{ active: session.id === copilotStore.activeSessionId }" @click="selectExistingSession(session.id)">
-            <span>{{ taskLabel(session.task) }}</span>
-            <small>{{ formatTime(session.updated_at) }}</small>
-          </button>
-          <a-empty v-if="!copilotStore.sessions.length" :image="false" description="还没有对话记录" />
         </section>
       </aside>
 
@@ -117,7 +138,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { BulbOutlined, FileSearchOutlined, LoadingOutlined, MessageOutlined, RobotOutlined, RocketOutlined, SendOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { BulbOutlined, FileSearchOutlined, HistoryOutlined, LoadingOutlined, MessageOutlined, RobotOutlined, RocketOutlined, SendOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { listResumes, listVersions, getVersion } from '@/api/resume'
 import { applyCopilotProposal } from '@/api/copilot'
 import { useCopilotStore } from '@/stores/copilot'
@@ -139,6 +160,7 @@ const task = ref<CopilotTask>('jd_match')
 const projectIndex = ref(0)
 const input = ref('')
 const applying = ref(false)
+const showHistory = ref(false)
 
 const escapeMessageHtml = (content: string): string =>
   content.replace(/[&<>"']/g, (character) => {
@@ -397,6 +419,13 @@ onMounted(async () => {
   gap: 6px;
 }
 
+.page-title-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .copilot-header .page-title {
   margin: 0;
   color: var(--foreground);
@@ -405,6 +434,46 @@ onMounted(async () => {
   font-weight: 720;
   letter-spacing: -0.045em;
   line-height: 1.12;
+}
+
+.copilot-header :deep(.history-toggle) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
+}
+
+.copilot-header :deep(.history-toggle:hover) {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--brand-50);
+}
+
+.copilot-header :deep(.history-toggle small) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--background-100);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.copilot-header :deep(.history-toggle:hover small) {
+  background: var(--brand-100);
+  color: var(--primary);
 }
 
 .copilot-header .page-desc {
@@ -441,7 +510,6 @@ onMounted(async () => {
 
 .context-panel,
 .task-panel,
-.history-panel,
 .chat-shell,
 .project-picker {
   border: 1px solid var(--border);
@@ -451,8 +519,7 @@ onMounted(async () => {
 }
 
 .context-panel,
-.task-panel,
-.history-panel {
+.task-panel {
   padding: 16px;
 }
 
@@ -598,11 +665,6 @@ onMounted(async () => {
   opacity: 0.78;
 }
 
-.history-panel {
-  max-height: 280px;
-  overflow: auto;
-}
-
 .history-item {
   display: flex;
   width: 100%;
@@ -625,6 +687,12 @@ onMounted(async () => {
   border-color: var(--brand-100);
   background: var(--brand-50);
   color: var(--primary);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .copilot-main {
@@ -979,10 +1047,6 @@ onMounted(async () => {
     align-items: start;
   }
 
-  .history-panel {
-    grid-column: 1 / -1;
-  }
-
   .chat-messages {
     max-height: none;
   }
@@ -999,6 +1063,10 @@ onMounted(async () => {
 
   .copilot-sidebar {
     display: flex;
+  }
+
+  .page-title-line {
+    align-items: flex-start;
   }
 
   .project-picker {
