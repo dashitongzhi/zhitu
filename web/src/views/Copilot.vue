@@ -2,7 +2,6 @@
   <div class="copilot-page">
     <header class="copilot-header page-header">
       <div class="page-title-group">
-        <p class="eyebrow">职途 · 求职工作台</p>
         <h1 class="page-title">求职 Copilot</h1>
         <p class="page-desc subtitle">围绕你的真实简历和目标岗位，分析差距、打磨项目、预测面试。</p>
       </div>
@@ -396,14 +395,6 @@ onMounted(async () => {
 
 .page-title-group {
   gap: 6px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
 }
 
 .copilot-header .page-title {
