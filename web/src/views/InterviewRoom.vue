@@ -8,14 +8,18 @@ import {
   ArrowLeftOutlined,
   PoweroffOutlined,
   MessageOutlined,
+  SoundOutlined,
   AudioOutlined,
   SendOutlined,
+  FileTextOutlined,
   CheckCircleOutlined,
   WarningOutlined,
   BulbOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons-vue'
 import { useInterviewStore } from '@/stores/interview'
+import { transcribeVoice } from '@/api/interview'
+import { listResumes, listVersions } from '@/api/resume'
 import type {
   InterviewScene,
   InterviewMode,
@@ -24,6 +28,8 @@ import type {
   InterviewDimension,
   InterviewMessage,
   QuestionFeedbackItem,
+  Resume,
+  ResumeVersion,
 } from '@/types/models'
 
 const route = useRoute()
@@ -65,6 +71,13 @@ const isRecording = ref(false)
 const voicePreparing = ref(false)
 const recordingFinalizing = ref(false)
 const recordingSeconds = ref(0)
+const transcribingDraft = ref(false)
+type AudioDraft = {
+  file: File
+  objectUrl: string
+  durationSeconds: number
+}
+const audioDraft = ref<AudioDraft | null>(null)
 const recordingTimeLabel = computed(() => {
   const minutes = Math.floor(recordingSeconds.value / 60)
   const seconds = recordingSeconds.value % 60
@@ -90,27 +103,33 @@ const audioPlayer = ref<HTMLAudioElement | null>(null)
 let ttsObjectUrl: string | null = null
 const autoTtsAttempted = new Set<number>()
 
+// 发送简历相关状态
+const resumeModalVisible = ref(false)
+const loadingResumes = ref(false)
+const loadingVersions = ref(false)
+const attaching = ref(false)
+const resumeList = ref<Resume[]>([])
+const versionList = ref<ResumeVersion[]>([])
+const selectedResumeId = ref<number | null>(null)
+const selectedVersionId = ref<number>(0)
+const resumeAttached = computed(
+  () => !!interviewStore.currentInterview?.resume_snapshot
+)
+
 // 计算属性
 const isOngoing = computed(
   () => interviewStore.currentInterview?.status === 'ongoing'
 )
-const isPreparing = computed(
-  () => interviewStore.currentInterview?.status === 'preparing'
-)
 const isCompleted = computed(
   () => interviewStore.currentInterview?.status === 'completed'
 )
-const activeMode = computed(() => interviewStore.currentInterview?.mode || 'hybrid')
-const selectedMode = ref<InterviewMode>('hybrid')
-const isVoiceMode = computed(() => activeMode.value === 'voice')
-const isHybridMode = computed(() => activeMode.value === 'hybrid')
-const hybridTextInput = ref(false)
-const showTextInput = computed(() => activeMode.value === 'text' || (isHybridMode.value && hybridTextInput.value))
 const canSendVoice = computed(() => {
-  return isVoiceMode.value || isHybridMode.value
+  const mode = interviewStore.currentInterview?.mode
+  return mode === 'voice' || mode === 'hybrid'
 })
 const canPlayTts = computed(() => {
-  return isVoiceMode.value || isHybridMode.value
+  const mode = interviewStore.currentInterview?.mode
+  return mode === 'voice' || mode === 'hybrid'
 })
 const isTeachingScene = computed(() => interviewStore.currentInterview?.scene === 'teaching')
 const latestQuestion = computed(() => {
@@ -228,7 +247,6 @@ const modeColor = (m: InterviewMode | string): string => {
 // 状态
 const statusLabel = (s: InterviewStatus | string): string => {
   const map: Record<string, string> = {
-    preparing: '准备中',
     ongoing: '进行中',
     completed: '已完成',
     cancelled: '已取消',
@@ -237,7 +255,6 @@ const statusLabel = (s: InterviewStatus | string): string => {
 }
 const statusBadge = (s: InterviewStatus | string): 'success' | 'processing' | 'default' | 'error' => {
   const map: Record<string, 'success' | 'processing' | 'default' | 'error'> = {
-    preparing: 'processing',
     ongoing: 'processing',
     completed: 'success',
     cancelled: 'default',
@@ -352,37 +369,110 @@ const backToList = () => {
   router.push('/app/interviews')
 }
 
-// ============ 交互模式 ============
+// ============ 发送简历相关 ============
 
-const handleModeChange = async (event: { target?: { value?: InterviewMode } }) => {
-  const mode = event.target?.value || selectedMode.value
-  if (!interviewId.value || mode === activeMode.value) return
-  const updated = await interviewStore.setMode(interviewId.value, mode)
-  if (!updated) {
-    selectedMode.value = activeMode.value as InterviewMode
-    return
-  }
-  selectedMode.value = mode
-  // 每次切回混合模式都从默认的语音输入开始，键盘输入需要用户主动开启。
-  hybridTextInput.value = false
-  if (canPlayTts.value && isOngoing.value) {
-    const latest = [...interviewStore.messages].reverse().find((item) => item.role === 'assistant')
-    if (latest) void handlePlayTts(latest, true)
+// 前往简历实验室（无简历时）
+const goToResumeLab = () => {
+  resumeModalVisible.value = false
+  router.push('/app/resumes')
+}
+
+// 版本时间格式化（用于下拉展示）
+const formatVersionTime = (dateStr: string): string => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+// 拉取用户简历列表
+const loadResumes = async () => {
+  loadingResumes.value = true
+  try {
+    const resp = await listResumes()
+    resumeList.value = resp.data.data || []
+    // 默认选中第一份简历
+    if (resumeList.value.length > 0 && selectedResumeId.value === null) {
+      selectedResumeId.value = resumeList.value[0].id
+      await loadVersions(resumeList.value[0].id)
+    }
+  } catch (error) {
+    console.error('加载简历列表失败:', error)
+    message.error('加载简历列表失败')
+  } finally {
+    loadingResumes.value = false
   }
 }
 
-const voiceStatusText = computed(() => {
-  if (voicePreparing.value) return '正在连接麦克风'
-  if (recordingFinalizing.value || interviewStore.sending) return '正在转写并准备下一题'
-  if (isRecording.value) return '正在听取回答 · ' + recordingTimeLabel.value
-  if (playingMessageId.value !== null) return '面试官正在说话'
-  return '等待你的回答'
-})
+// 选择简历时加载版本列表
+const onResumeChange = async (resumeId: number) => {
+  selectedVersionId.value = 0
+  versionList.value = []
+  if (!resumeId) return
+  await loadVersions(resumeId)
+}
 
-// 发送文字回答；语音回答在录音结束时自动发送
+const loadVersions = async (resumeId: number) => {
+  loadingVersions.value = true
+  try {
+    const resp = await listVersions(resumeId)
+    versionList.value = resp.data.data || []
+  } catch (error) {
+    console.error('加载简历版本失败:', error)
+  } finally {
+    loadingVersions.value = false
+  }
+}
+
+// 打开发送简历弹窗
+const openResumeModal = async () => {
+  resumeModalVisible.value = true
+  if (resumeList.value.length === 0) {
+    await loadResumes()
+  }
+}
+
+// 确认发送简历
+const confirmAttachResume = async () => {
+  if (!selectedResumeId.value) {
+    message.warning('请先选择一份简历')
+    return
+  }
+  if (!isOngoing.value) {
+    message.warning('面试已结束，无法发送简历')
+    return
+  }
+  attaching.value = true
+  try {
+    const attached = await interviewStore.attachResume(interviewId.value, {
+      resume_id: selectedResumeId.value,
+      version_id: selectedVersionId.value || undefined,
+    })
+    if (!attached) return
+    resumeModalVisible.value = false
+    // 切到面试信息 Tab，让用户看到已发送简历的展示
+    sideTab.value = 'info'
+  } finally {
+    attaching.value = false
+  }
+}
+
+// 发送文字回答或音频草稿
 const handleSendAnswer = async () => {
   if (!isOngoing.value) {
     message.warning('面试已结束，无法继续作答')
+    return
+  }
+
+  if (audioDraft.value) {
+    const draft = audioDraft.value
+    const sent = await interviewStore.sendVoice(interviewId.value, draft.file)
+    if (sent) clearAudioDraft()
     return
   }
 
@@ -418,6 +508,13 @@ const stopRecordingTimer = () => {
 const releaseMicrophone = () => {
   microphoneStream?.getTracks().forEach((track) => track.stop())
   microphoneStream = null
+}
+
+const clearAudioDraft = () => {
+  if (audioDraft.value) {
+    URL.revokeObjectURL(audioDraft.value.objectUrl)
+    audioDraft.value = null
+  }
 }
 
 const teardownAudioGraph = async () => {
@@ -539,10 +636,13 @@ const finalizeVoiceRecording = async () => {
     `voice-answer-${Date.now()}.wav`,
     { type: 'audio/wav' }
   )
-  const durationSeconds = normalizedPCM.length / targetSampleRate
+  clearAudioDraft()
+  audioDraft.value = {
+    file,
+    objectUrl: URL.createObjectURL(file),
+    durationSeconds: normalizedPCM.length / targetSampleRate,
+  }
   recordingSeconds.value = 0
-  const sent = await interviewStore.sendVoice(interviewId.value, file, durationSeconds)
-  if (!sent) message.error('语音回答发送失败，请重试')
   recordingFinalizing.value = false
 }
 
@@ -637,6 +737,43 @@ const discardVoiceRecording = () => {
   isRecording.value = false
 }
 
+const formatDuration = (seconds: number) => {
+  const rounded = Math.max(0, Math.round(seconds))
+  const minutes = Math.floor(rounded / 60)
+  return `${String(minutes).padStart(2, '0')}:${String(rounded % 60).padStart(2, '0')}`
+}
+
+const formatFileSize = (size: number) => {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+const handleTranscribeDraft = async () => {
+  const draft = audioDraft.value
+  if (!draft || transcribingDraft.value) return
+  transcribingDraft.value = true
+  try {
+    const response = await transcribeVoice(interviewId.value, draft.file)
+    const text = response.data.data?.text?.trim()
+    if (!text) {
+      message.error('未识别到有效文字，请重新录制')
+      return
+    }
+    clearAudioDraft()
+    inputText.value = text
+    message.success('已转化为文本，可编辑后发送')
+  } catch (error) {
+    console.error('语音转文字失败:', error)
+  } finally {
+    transcribingDraft.value = false
+  }
+}
+
+const rerecordVoice = async () => {
+  clearAudioDraft()
+  await startVoiceRecording()
+}
+
 // TTS 播放（调后端 xiaomi mimo TTS）
 const stopTtsPlayback = () => {
   const player = audioPlayer.value
@@ -700,6 +837,7 @@ const handlePlayTts = async (msg: InterviewMessage, automatic = false) => {
 
 onBeforeUnmount(() => {
   discardVoiceRecording()
+  clearAudioDraft()
   stopTtsPlayback()
 })
 
@@ -732,12 +870,6 @@ onMounted(async () => {
     return
   }
   await interviewStore.fetchOne(interviewId.value)
-  if (interviewStore.currentInterview) {
-    selectedMode.value = interviewStore.currentInterview.mode
-  }
-  if (interviewStore.currentInterview?.status === 'preparing') {
-    await interviewStore.startInterview(interviewId.value)
-  }
   // 已完成的面试：自动加载报告 + 评分
   if (interviewStore.currentInterview?.status === 'completed') {
     sideTab.value = 'report'

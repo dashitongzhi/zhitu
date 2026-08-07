@@ -140,6 +140,18 @@
                     <span v-if="msg.duration_sec > 0" class="msg-duration">
                       · {{ msg.duration_sec }}s
                     </span>
+                    <!-- TTS 播放按钮：仅 assistant 消息 + mode 为 voice/hybrid -->
+                    <a-button
+                      v-if="canPlayTts && msg.role === 'assistant'"
+                      type="link"
+                      size="small"
+                      :loading="ttsLoadingId === msg.id"
+                      :disabled="ttsLoadingId !== null && ttsLoadingId !== msg.id"
+                      @click="handlePlayTts(msg)"
+                    >
+                      <SoundOutlined />
+                      {{ playingMessageId === msg.id ? '停止' : '播放' }}
+                    </a-button>
                   </div>
                   <div class="msg-bubble" v-html="renderMessageContent(msg.content)"></div>
                   <div class="msg-time">{{ formatTime(msg.created_at) }}</div>
@@ -170,8 +182,8 @@
                 v-if="showTextInput"
                 v-model:value="inputText"
                 :rows="3"
-                placeholder="输入你的回答..."
-                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing"
+                :placeholder="audioDraft ? '录音已作为音频文件加入，可转成文字后编辑' : '输入你的回答...'"
+                :disabled="interviewStore.sending || isRecording || voicePreparing || recordingFinalizing || !!audioDraft"
                 @keydown.enter.exact="handleAnswerKeydown"
               />
               <div class="input-toolbar">
@@ -435,4 +447,75 @@
       preload="none"
     ></audio>
 
+    <!-- 发送简历弹窗：选择简历 + 版本 -->
+    <a-modal
+      v-model:open="resumeModalVisible"
+      title="发送简历给 AI 面试官"
+      ok-text="发送简历"
+      cancel-text="取消"
+      :ok-button-props="{ loading: attaching, disabled: !selectedResumeId }"
+      :cancel-button-props="{ disabled: attaching }"
+      :mask-closable="false"
+      width="520px"
+      @ok="confirmAttachResume"
+    >
+      <a-spin :spinning="loadingResumes" tip="加载简历列表...">
+        <a-empty
+          v-if="!loadingResumes && resumeList.length === 0"
+          description="还没有简历，请先到「简历实验室」创建简历"
+        >
+          <a-button type="primary" @click="goToResumeLab">前往简历实验室</a-button>
+        </a-empty>
+        <div v-else class="resume-modal-body">
+          <p class="modal-tip">
+            选择一份简历绑定到本次面试。
+          </p>
+          <a-form layout="vertical">
+            <a-form-item label="选择简历">
+              <a-select
+                v-model:value="selectedResumeId"
+                placeholder="请选择简历"
+                :disabled="attaching"
+                @change="onResumeChange"
+              >
+                <a-select-option
+                  v-for="r in resumeList"
+                  :key="r.id"
+                  :value="r.id"
+                >
+                  {{ r.name }}
+                  <span class="resume-meta">
+                    （{{ r.target_position || '未指定岗位' }}）
+                  </span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="选择版本">
+              <a-select
+                v-model:value="selectedVersionId"
+                placeholder="默认使用当前版本"
+                :disabled="attaching || !selectedResumeId || loadingVersions"
+                :loading="loadingVersions"
+              >
+                <a-select-option :value="0">当前版本</a-select-option>
+                <a-select-option
+                  v-for="v in versionList"
+                  :key="v.id"
+                  :value="v.id"
+                >
+                  {{ v.version_label }}
+                  <span class="resume-meta">· {{ formatVersionTime(v.created_at) }}</span>
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+          <a-alert
+            v-if="resumeAttached"
+            type="info"
+            show-icon
+            message="本次面试已绑定过简历，再次发送将覆盖之前绑定的简历。"
+          />
+        </div>
+      </a-spin>
+    </a-modal>
   </div>

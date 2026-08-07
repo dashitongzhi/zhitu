@@ -63,8 +63,13 @@ func TestResumeCopilotChatValidatesTaskAndContext(t *testing.T) {
 	}
 	if _, err := service.Chat(context.Background(), 7, &CopilotInput{
 		Task: CopilotTaskProjectOptimize, DraftContent: `{"project":[{"name":"支付平台"}]}`, ProjectIndex: intPtr(1),
-	}); err == nil || err.Error() != "project_index is out of range" {
+	}); !errors.Is(err, ErrCopilotProjectRange) {
 		t.Fatalf("out-of-range project error = %v", err)
+	}
+	if _, err := service.Chat(context.Background(), 7, &CopilotInput{
+		Task: CopilotTaskProjectOptimize, DraftContent: `{"project":[]}`, ProjectIndex: intPtr(0),
+	}); !errors.Is(err, ErrCopilotProjectEmpty) {
+		t.Fatalf("empty project error = %v", err)
 	}
 }
 
