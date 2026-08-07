@@ -80,7 +80,10 @@ func main() {
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:      engine,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		// AI/SSE handlers flush an initial status event before the model finishes.
+		// Keep the connection writable for the configured upstream model timeout;
+		// otherwise responses taking more than 15 seconds are silently truncated.
+		WriteTimeout: 5 * time.Minute,
 	}
 
 	go func() {
