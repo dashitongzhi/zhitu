@@ -184,6 +184,7 @@ type ttsResponseMimo struct {
 var (
 	ErrLLMNotConfigured = errors.New("llm not configured: api_key is empty")
 	ErrLLMEmptyResponse = errors.New("llm returned empty content")
+	ErrLLMInvalidJSON   = errors.New("llm returned invalid json")
 	ErrLLMStreamFailed  = errors.New("llm stream interrupted")
 )
 
@@ -340,7 +341,13 @@ func (s *LLMService) ChatJSON(ctx context.Context, messages []ChatMessage, out i
 				return nil
 			}
 		}
-		return fmt.Errorf("unmarshal llm json: %w (raw: %s)", err, truncate(content, 500))
+		// 部分兼容接口会在 JSON 前后添加解释文字，但不使用代码块。
+		if extracted = extractJSONObject(content); extracted != "" {
+			if err2 := json.Unmarshal([]byte(extracted), out); err2 == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("%w: %v (raw: %s)", ErrLLMInvalidJSON, err, truncate(content, 500))
 	}
 	return nil
 }
@@ -403,6 +410,36 @@ func extractJSONBlock(s string) string {
 		return ""
 	}
 	return strings.TrimSpace(s[start : start+end])
+}
+
+// extractJSONObject returns the first balanced JSON object outside markdown.
+// It accounts for braces inside quoted strings and escaped quotes.
+func extractJSONObject(s string) string {
+	start := strings.IndexByte(s, '{')
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(s); i++ {
+		switch ch := s[i]; {
+		case escaped:
+			escaped = false
+		case inString && ch == '\\':
+			escaped = true
+		case ch == '"':
+			inString = !inString
+		case !inString && ch == '{':
+			depth++
+		case !inString && ch == '}':
+			depth--
+			if depth == 0 {
+				return strings.TrimSpace(s[start : i+1])
+			}
+		}
+	}
+	return ""
 }
 
 // truncate 截断字符串到指定长度

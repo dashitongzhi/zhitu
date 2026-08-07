@@ -204,7 +204,18 @@ func (s *ResumeCopilotService) Chat(ctx context.Context, userID uint, in *Copilo
 	}
 	var generated copilotLLMResponse
 	if err := s.llm.ChatJSON(ctx, messages, &generated); err != nil {
-		return nil, fmt.Errorf("copilot llm: %w", err)
+		if !errors.Is(err, ErrLLMInvalidJSON) && !errors.Is(err, ErrLLMEmptyResponse) {
+			return nil, fmt.Errorf("copilot llm: %w", err)
+		}
+		// MiMo occasionally wraps or truncates structured output. Retry once with
+		// an explicit JSON-only reminder so a transient formatting issue does not
+		// silently terminate an otherwise valid multi-turn conversation.
+		retryMessages := append([]ChatMessage(nil), messages...)
+		retryMessages[len(retryMessages)-1].Content += "\n\n只返回一个完整、合法的 JSON 对象；不要添加解释、前缀或 Markdown 代码块。"
+		generated = copilotLLMResponse{}
+		if retryErr := s.llm.ChatJSON(ctx, retryMessages, &generated); retryErr != nil {
+			return nil, fmt.Errorf("copilot llm retry: %w", retryErr)
+		}
 	}
 
 	result := &CopilotResponse{
