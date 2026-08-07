@@ -201,10 +201,11 @@ export const useCopilotStore = defineStore('copilot', () => {
         onStatus: () => undefined,
         onCopilotDone: (data) => {
           const result = data.result
-          if (!result) return
+          const reply = data.message?.content || result?.reply || ''
+          if (!reply && !result) return
           const assistant: CopilotMessage = {
             role: 'assistant',
-            content: data.message?.content || result.reply,
+            content: reply || '分析已完成，请查看下方结果。',
             created_at: new Date().toISOString(),
             result,
           }
@@ -213,9 +214,19 @@ export const useCopilotStore = defineStore('copilot', () => {
           session.updated_at = new Date().toISOString()
           void persist(session)
           success = true
-          input.onResult?.(result)
+          if (result) input.onResult?.(result)
         },
-        onError: (error) => message.error(error || 'Copilot 暂时无法回答'),
+        onError: (error) => {
+          const failure: CopilotMessage = {
+            role: 'assistant',
+            content: error || 'Copilot 暂时无法回答',
+            created_at: new Date().toISOString(),
+          }
+          session.messages.push(failure)
+          session.updated_at = new Date().toISOString()
+          void persist(session)
+          message.error(error || 'Copilot 暂时无法回答')
+        },
       })
       return success
     } catch (error) {
