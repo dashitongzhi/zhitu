@@ -32,8 +32,8 @@ var (
 )
 
 // ResumeCopilotService is the task-oriented agent for resume and job-search work.
-// It deliberately does not persist chat messages: the browser owns the short-lived session,
-// while this service reloads authoritative resume data through ResumeService on every turn.
+// Every turn is sent to this service and analyzed by the configured server-side LLM;
+// authoritative resume data is reloaded through ResumeService on every turn.
 type ResumeCopilotService struct {
 	llm     *LLMService
 	resume  *ResumeService

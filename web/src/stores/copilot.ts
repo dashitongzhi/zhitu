@@ -16,6 +16,12 @@ const STORE_NAME = 'sessions'
 const COOKIE_NAME = 'zhitu-copilot-session'
 const FALLBACK_KEY = 'zhitu-copilot-sessions'
 
+// IndexedDB structured clone cannot persist Vue's reactive Proxy objects.
+// Keep a plain JSON snapshot at the storage boundary so persistence never
+// blocks the actual Copilot request with a DataCloneError.
+const toPersistedSession = (session: CopilotSession): CopilotSession =>
+  JSON.parse(JSON.stringify(session)) as CopilotSession
+
 const cookieValue = () => {
   if (typeof document === 'undefined') return ''
   return document.cookie
@@ -61,17 +67,27 @@ const readSessions = async (): Promise<CopilotSession[]> => {
 }
 
 const writeSession = async (session: CopilotSession) => {
+  const snapshot = toPersistedSession(session)
   const db = await openDB()
   if (!db) {
     const sessions = await readSessions()
-    const next = [session, ...sessions.filter((item) => item.id !== session.id)].slice(0, 30)
-    localStorage.setItem(FALLBACK_KEY, JSON.stringify(next))
+    const next = [snapshot, ...sessions.filter((item) => item.id !== snapshot.id)].slice(0, 30)
+    try {
+      localStorage.setItem(FALLBACK_KEY, JSON.stringify(next))
+    } catch {
+      // Browser storage is optional; the model request must still be sent.
+    }
     return
   }
   await new Promise<void>((resolve) => {
-    const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(session)
-    request.onsuccess = () => resolve()
-    request.onerror = () => resolve()
+    try {
+      const request = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).put(snapshot)
+      request.onsuccess = () => resolve()
+      request.onerror = () => resolve()
+    } catch {
+      // A storage failure must not prevent the model request from running.
+      resolve()
+    }
   })
 }
 
@@ -97,12 +113,17 @@ export const useCopilotStore = defineStore('copilot', () => {
   const activeSession = computed(() => sessions.value.find((item) => item.id === activeSessionId.value) || null)
 
   const persist = async (session: CopilotSession) => {
-    const index = sessions.value.findIndex((item) => item.id === session.id)
-    if (index >= 0) sessions.value[index] = { ...session }
-    else sessions.value.unshift(session)
+    const snapshot = toPersistedSession(session)
+    const index = sessions.value.findIndex((item) => item.id === snapshot.id)
+    if (index >= 0) sessions.value[index] = snapshot
+    else sessions.value.unshift(snapshot)
     sessions.value.sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    await writeSession(session)
-    setCookieValue(session.id)
+    try {
+      await writeSession(snapshot)
+    } catch {
+      // Local history is a convenience and must never block the server request.
+    }
+    setCookieValue(snapshot.id)
   }
 
   const init = async () => {

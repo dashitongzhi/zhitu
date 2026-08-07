@@ -36,12 +36,12 @@
         </section>
 
         <section class="history-panel">
-          <div class="panel-title"><span>本地对话</span><small>{{ copilotStore.sessions.length }} 个</small></div>
+          <div class="panel-title"><span>对话记录</span><small>{{ copilotStore.sessions.length }} 个</small></div>
           <button v-for="session in copilotStore.sessions" :key="session.id" type="button" class="history-item" :class="{ active: session.id === copilotStore.activeSessionId }" @click="selectExistingSession(session.id)">
             <span>{{ taskLabel(session.task) }}</span>
             <small>{{ formatTime(session.updated_at) }}</small>
           </button>
-          <a-empty v-if="!copilotStore.sessions.length" :image="null" description="还没有本地对话" />
+          <a-empty v-if="!copilotStore.sessions.length" :image="null" description="还没有对话记录" />
         </section>
       </aside>
 
@@ -100,7 +100,7 @@
           </div>
           <div class="composer">
             <a-textarea v-model:value="input" :rows="3" :disabled="copilotStore.loading" :placeholder="composerPlaceholder" @keydown.enter.exact="handleEnter" />
-            <div class="composer-foot"><span>对话会保存在当前浏览器，不会写入服务端聊天记录</span><a-button type="primary" :loading="copilotStore.loading" :disabled="!input.trim() || (!selectedResumeId && !resumePaste.trim())" @click="sendMessage()"><SendOutlined />发送</a-button></div>
+            <div class="composer-foot"><span>消息将发送至服务端，由 AI 模型结合简历内容分析</span><a-button type="primary" :loading="copilotStore.loading" :disabled="!input.trim() || (!selectedResumeId && !resumePaste.trim())" @click="sendMessage()"><SendOutlined />发送</a-button></div>
           </div>
         </div>
       </main>
