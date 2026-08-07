@@ -148,9 +148,24 @@ function dispatchEvent(event: SSEEvent, callbacks: SSECallbacks): void {
       }
       break
     case 'done':
-      callbacks.onDone?.({
+      if (callbacks.onCopilotDone) {
+        callbacks.onCopilotDone({
+          message: event.message as never,
+          result: event.result as never,
+          proposals: event.proposals,
+          memory_summary: event.memory_summary,
+        })
+      } else {
+        callbacks.onDone?.({
+          message: event.message as never,
+          version: event.version,
+        })
+      }
+      break
+    case 'started':
+      callbacks.onStarted?.({
         message: event.message as never,
-        version: event.version,
+        interview: event.interview,
       })
       break
     case 'interview_ended':
