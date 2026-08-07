@@ -6,7 +6,7 @@
         <h1>求职 Copilot</h1>
         <p class="subtitle">围绕你的真实简历和目标岗位，分析差距、打磨项目、预测面试。</p>
       </div>
-      <a-button @click="clearLocalSessions">清除本地对话</a-button>
+      <a-button @click="clearLocalSessions">清除对话记录</a-button>
     </header>
 
     <div class="copilot-layout">
@@ -54,7 +54,7 @@
         </div>
         <div class="chat-shell">
           <div class="chat-title">
-            <div><strong>{{ taskLabel(task) }}</strong><span v-if="activeSession"> · 本地保存</span></div>
+            <div><strong>{{ taskLabel(task) }}</strong><span v-if="activeSession"> · 服务端 AI 分析</span></div>
             <a-button v-if="activeSession" type="text" @click="newConversation">新对话</a-button>
           </div>
           <div class="chat-messages">
@@ -302,7 +302,7 @@ const quickPrompts = computed(() => task.value === 'jd_match' ? ['先给我一�
 
 const clearLocalSessions = async () => {
   await copilotStore.clearAll()
-  message.success('本地 Copilot 对话已清除')
+  message.success('Copilot 对话已清除')
 }
 
 const handleResumeFile = async (event: Event) => {
