@@ -67,6 +67,15 @@ func TestCompleteCopilotLLMResponseRequiresTaskResult(t *testing.T) {
 	}
 }
 
+func TestCopilotTaskOutputSchemaIncludesProjectShape(t *testing.T) {
+	schema := copilotTaskOutputSchema(CopilotTaskProjectOptimize)
+	for _, field := range []string{"current_issues", "star_analysis", "rewritten_description", "rewritten_tech_stack"} {
+		if !strings.Contains(schema, field) {
+			t.Fatalf("project schema missing %q: %s", field, schema)
+		}
+	}
+}
+
 func newCopilotTestService(t *testing.T) (*ResumeCopilotService, *gorm.DB, *models.Resume, *models.ResumeVersion) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())), &gorm.Config{

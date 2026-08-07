@@ -216,7 +216,7 @@ func (s *ResumeCopilotService) Chat(ctx context.Context, userID uint, in *Copilo
 		// an explicit schema reminder when JSON is malformed or a task-specific
 		// result object is missing.
 		retryMessages := append([]ChatMessage(nil), messages...)
-		retryMessages[len(retryMessages)-1].Content += "\n\n只返回一个完整、合法的 JSON 对象；不要添加解释、前缀或 Markdown 代码块。必须填写当前任务对应的结构化结果字段。"
+		retryMessages[len(retryMessages)-1].Content += "\n\n只返回一个完整、合法的 JSON 对象；不要添加解释、前缀或 Markdown 代码块。\n" + copilotTaskOutputSchema(in.Task)
 		generated = copilotLLMResponse{}
 		if retryErr := s.llm.ChatJSON(ctx, retryMessages, &generated); retryErr != nil {
 			return nil, fmt.Errorf("copilot llm retry: %w", retryErr)
@@ -260,6 +260,19 @@ func completeCopilotLLMResponse(task string, generated *copilotLLMResponse) bool
 		return generated.Prediction != nil
 	default:
 		return true
+	}
+}
+
+func copilotTaskOutputSchema(task string) string {
+	switch task {
+	case CopilotTaskJDMatch:
+		return `match 必须是对象：{"match_score":0,"strengths":[],"missing_capabilities":[],"requirement_map":[{"title":"","priority":"required|preferred|bonus","status":"matched|partial|missing|unverified","evidence":[],"gap":""}],"recommendations":[]}`
+	case CopilotTaskProjectOptimize:
+		return `project 必须是对象：{"current_issues":[],"star_analysis":{"situation":"","task":"","action":"","result":""},"technical_highlights":[],"missing_evidence":[],"rewritten_description":"","rewritten_tech_stack":[]}`
+	case CopilotTaskInterviewPredict:
+		return `prediction 必须是对象：{"risk_points":[],"resume_triggers":[],"questions":[{"question":"","type":"","priority":"","reason":"","answer_plan":""}]}`
+	default:
+		return `reply 必须是非空字符串；match、project、prediction 均为 null。`
 	}
 }
 
@@ -362,7 +375,7 @@ func (s *ResumeCopilotService) buildPrompt(in *CopilotInput, data *resumeCopilot
 		bytes, _ := json.Marshal(data.Content.Project[*in.ProjectIndex])
 		project = string(bytes)
 	}
-	return fmt.Sprintf(`当前任务：%s
+	prompt := fmt.Sprintf(`当前任务：%s
 
 候选人简历名称：%s
 目标岗位：%s
@@ -379,6 +392,8 @@ JD：
 <selected_project>%s</selected_project>
 
 对话历史已经由客户端提供。请根据本轮任务给出结构化 JSON。`, taskLabel(in.Task), data.Resume.Name, data.Resume.TargetPosition, truncateRunes(jd, maxCopilotJDRunes), data.Summary, data.RawJSON, project)
+	prompt += "\n\n当前任务输出要求：\n" + copilotTaskOutputSchema(in.Task)
+	return prompt
 }
 
 func effectiveJD(input, fallback string) string {
