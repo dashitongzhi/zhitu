@@ -101,6 +101,7 @@ const ttsLoadingId = ref<number | null>(null)
 const playingMessageId = ref<number | null>(null)
 const audioPlayer = ref<HTMLAudioElement | null>(null)
 let ttsObjectUrl: string | null = null
+const autoTtsAttempted = new Set<number>()
 
 // 发送简历相关状态
 const resumeModalVisible = ref(false)
@@ -158,7 +159,14 @@ const scrollToBottom = () => {
 
 watch(
   () => interviewStore.messages.length,
-  () => scrollToBottom()
+  () => {
+    scrollToBottom()
+    const latest = [...interviewStore.messages].reverse().find((item) => item.role === 'assistant')
+    if (latest && canPlayTts.value && isOngoing.value && !autoTtsAttempted.has(latest.id)) {
+      autoTtsAttempted.add(latest.id)
+      void handlePlayTts(latest, true)
+    }
+  }
 )
 watch(
   () => interviewStore.streamingText,
@@ -783,7 +791,7 @@ const stopTtsPlayback = () => {
   playingMessageId.value = null
 }
 
-const handlePlayTts = async (msg: InterviewMessage) => {
+const handlePlayTts = async (msg: InterviewMessage, automatic = false) => {
   // 同一题 → 停止
   if (playingMessageId.value === msg.id) {
     stopTtsPlayback()
@@ -791,7 +799,7 @@ const handlePlayTts = async (msg: InterviewMessage) => {
   }
   // 正在合成别的 → 拒绝并发
   if (ttsLoadingId.value !== null) {
-    message.warning('正在合成上一题语音，请稍候')
+    if (!automatic) message.warning('正在合成上一题语音，请稍候')
     return
   }
   const player = audioPlayer.value
@@ -813,7 +821,7 @@ const handlePlayTts = async (msg: InterviewMessage) => {
       stopTtsPlayback()
     }
     player.onerror = () => {
-      message.error('音频播放失败')
+      if (!automatic) message.error('音频播放失败')
       stopTtsPlayback()
     }
     await player.play()
@@ -821,7 +829,7 @@ const handlePlayTts = async (msg: InterviewMessage) => {
   } catch (error) {
     console.error('TTS 合成失败:', error)
     stopTtsPlayback()
-    message.error('音频合成失败，请稍后重试')
+    if (!automatic) message.error('音频合成失败，请稍后重试')
   } finally {
     if (ttsLoadingId.value === msg.id) ttsLoadingId.value = null
   }
