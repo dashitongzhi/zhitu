@@ -69,7 +69,7 @@
             <article v-for="(msg, index) in activeSession?.messages || []" :key="`${msg.created_at}-${index}`" class="chat-message" :class="msg.role">
               <div class="message-avatar">{{ msg.role === 'assistant' ? 'AI' : '我' }}</div>
               <div class="message-body">
-                <div class="message-content" v-text="msg.content"></div>
+                <div class="message-content" v-html="renderMessageContent(msg.content)"></div>
                 <div v-if="msg.result" class="result-card">
                   <div v-if="msg.result.match" class="match-result">
                     <div class="result-score"><strong>{{ msg.result.match.match_score }}</strong><small>/100 匹配度</small></div>
@@ -134,6 +134,24 @@ const task = ref<CopilotTask>('jd_match')
 const projectIndex = ref(0)
 const input = ref('')
 const applying = ref(false)
+
+const escapeMessageHtml = (content: string): string =>
+  content.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return entities[character]
+  })
+
+const renderMessageContent = (content: string): string =>
+  escapeMessageHtml(content)
+    .replace(/\*\*([\s\S]*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\*/g, '')
+    .replace(/\r?\n/g, '<br>')
 
 const selectedResume = computed(() => resumes.value.find((item) => item.id === selectedResumeId.value))
 const selectedVersionLabel = computed(() => versions.value.find((item) => item.id === selectedVersionId.value)?.version_label || '当前版本')
