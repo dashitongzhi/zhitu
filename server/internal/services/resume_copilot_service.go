@@ -24,8 +24,9 @@ const (
 var (
 	ErrCopilotInvalidTask    = errors.New("invalid copilot task")
 	ErrCopilotJDRequired     = errors.New("jd is required for this copilot task")
-	ErrCopilotProjectNeeded  = errors.New("project_index is required for project optimization")
-	ErrCopilotProjectRange   = errors.New("project_index is out of range")
+	ErrCopilotProjectNeeded  = errors.New("请选择需要优化的项目经历")
+	ErrCopilotProjectEmpty   = errors.New("当前简历没有可优化的项目经历，请先补充项目内容")
+	ErrCopilotProjectRange   = errors.New("所选项目不存在，请刷新简历后重新选择")
 	ErrCopilotInvalidContent = errors.New("content must be valid resume JSON")
 	ErrCopilotResumeChanged  = errors.New("resume has changed, please refresh the copilot proposal")
 	ErrCopilotContentTooLong = errors.New("copilot context is too long")
@@ -181,6 +182,9 @@ func (s *ResumeCopilotService) Chat(ctx context.Context, userID uint, in *Copilo
 	}
 	if requiresJD(in.Task) && strings.TrimSpace(in.JD) == "" && strings.TrimSpace(contextData.Resume.TargetJD) == "" {
 		return nil, ErrCopilotJDRequired
+	}
+	if in.Task == CopilotTaskProjectOptimize && len(contextData.Content.Project) == 0 {
+		return nil, ErrCopilotProjectEmpty
 	}
 	if in.Task == CopilotTaskProjectOptimize && in.ProjectIndex == nil {
 		return nil, ErrCopilotProjectNeeded

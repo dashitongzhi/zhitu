@@ -68,9 +68,10 @@
       <main class="copilot-main">
         <div v-if="task === 'project_optimize'" class="project-picker">
           <span>优化项目</span>
-          <a-select v-model:value="projectIndex" :disabled="!currentContent.project.length" placeholder="选择一个项目">
+          <a-select v-if="currentContent.project.length" v-model:value="projectIndex" placeholder="选择一个项目">
             <a-select-option v-for="(project, index) in currentContent.project" :key="index" :value="index">{{ project.name || `项目 ${index + 1}` }}</a-select-option>
           </a-select>
+          <div v-else class="project-empty"><InfoCircleOutlined /> 当前简历没有项目经历，请先补充项目内容后再分析</div>
         </div>
         <div class="chat-shell">
           <div class="chat-title">
@@ -89,7 +90,7 @@
               <h2>{{ welcomeTitle }}</h2>
               <p>{{ welcomeDescription }}</p>
               <div class="prompt-row">
-                <button v-for="prompt in quickPrompts" :key="prompt" type="button" @click="sendMessage(prompt)">{{ prompt }}</button>
+                <button v-for="prompt in quickPrompts" :key="prompt" type="button" :disabled="!hasValidProject" @click="sendMessage(prompt)">{{ prompt }}</button>
               </div>
             </div>
             <article v-for="(msg, index) in activeSession?.messages || []" :key="`${msg.created_at}-${index}`" class="chat-message" :class="msg.role">
@@ -126,7 +127,7 @@
           </div>
           <div class="composer">
             <a-textarea v-model:value="input" :rows="3" :disabled="copilotStore.loading" :placeholder="composerPlaceholder" @keydown.enter.exact="handleEnter" />
-            <div class="composer-foot"><span>消息将发送至服务端，由 AI 模型结合简历内容分析</span><a-button type="primary" :loading="copilotStore.loading" :disabled="!input.trim() || (!selectedResumeId && !resumePaste.trim())" @click="sendMessage()"><SendOutlined />发送</a-button></div>
+            <div class="composer-foot"><span>消息将发送至服务端，由 AI 模型结合简历内容分析</span><a-button type="primary" :loading="copilotStore.loading" :disabled="!canSend" @click="sendMessage()"><SendOutlined />发送</a-button></div>
           </div>
         </div>
       </main>
@@ -138,7 +139,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { BulbOutlined, FileSearchOutlined, HistoryOutlined, LoadingOutlined, MessageOutlined, RobotOutlined, RocketOutlined, SendOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { BulbOutlined, FileSearchOutlined, HistoryOutlined, InfoCircleOutlined, LoadingOutlined, MessageOutlined, RobotOutlined, RocketOutlined, SendOutlined, FileTextOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { listResumes, listVersions, getVersion } from '@/api/resume'
 import { applyCopilotProposal } from '@/api/copilot'
 import { useCopilotStore } from '@/stores/copilot'
@@ -183,6 +184,10 @@ const renderMessageContent = (content: string): string =>
 const selectedResume = computed(() => resumes.value.find((item) => item.id === selectedResumeId.value))
 const selectedVersionLabel = computed(() => versions.value.find((item) => item.id === selectedVersionId.value)?.version_label || '当前版本')
 const activeSession = computed(() => copilotStore.activeSession)
+const hasValidProject = computed(() => task.value !== 'project_optimize'
+  || (currentContent.project.length > 0 && projectIndex.value >= 0 && projectIndex.value < currentContent.project.length))
+const hasResumeContext = computed(() => Boolean(selectedResumeId.value || resumePaste.value.trim()))
+const canSend = computed(() => Boolean(input.value.trim()) && hasResumeContext.value && hasValidProject.value)
 
 const taskItems = [
   { key: 'jd_match' as const, title: '简历-JD 匹配', description: '看清优势和缺口', icon: FileSearchOutlined },
@@ -225,8 +230,9 @@ const loadVersionContent = async () => {
   if (!selectedResumeId.value || !selectedVersionId.value) return
   const response = await getVersion(selectedResumeId.value, selectedVersionId.value)
   try {
-    Object.assign(currentContent, JSON.parse(response.data.data?.content || '{}'))
-    currentContent.project = Array.isArray(currentContent.project) ? currentContent.project : []
+    const parsed = JSON.parse(response.data.data?.content || '{}')
+    currentContent.project = Array.isArray(parsed.project) ? parsed.project : []
+    if (projectIndex.value < 0 || projectIndex.value >= currentContent.project.length) projectIndex.value = 0
   } catch { currentContent.project = [] }
 }
 
@@ -271,7 +277,7 @@ const restoreSessionDraft = (draft: string) => {
 
 const newConversation = async () => {
   if (!selectedResumeId.value && !resumePaste.value.trim()) return
-  await copilotStore.createSession({ task: task.value, resumeId: selectedResumeId.value, versionId: selectedVersionId.value, jd: jd.value.trim(), draftContent: sessionDraftContent.value, projectIndex: task.value === 'project_optimize' ? projectIndex.value : undefined })
+  await copilotStore.createSession({ task: task.value, resumeId: selectedResumeId.value, versionId: selectedVersionId.value, jd: jd.value.trim(), draftContent: sessionDraftContent.value, projectIndex: task.value === 'project_optimize' && hasValidProject.value ? projectIndex.value : undefined })
 }
 
 const switchTask = async (next: CopilotTask) => {
@@ -303,6 +309,10 @@ const ensureSession = async () => {
 const sendMessage = async (quick?: string) => {
   const content = (quick || input.value).trim()
   if (!content || (!selectedResumeId.value && !resumePaste.value.trim())) return
+  if (!hasValidProject.value) {
+    message.warning('当前简历没有可优化的项目经历，请先补充项目内容')
+    return
+  }
   const session = await ensureSession()
   if (!session) return
   input.value = ''
@@ -718,6 +728,15 @@ onMounted(async () => {
   min-width: 260px;
 }
 
+.project-empty {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #a14e3a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .chat-shell {
   min-height: 680px;
   display: flex;
@@ -835,10 +854,17 @@ onMounted(async () => {
   transition: border-color 0.16s ease, color 0.16s ease, background-color 0.16s ease;
 }
 
-.prompt-row button:hover {
+.prompt-row button:hover:not(:disabled) {
   border-color: var(--primary);
   background: var(--brand-50);
   color: var(--primary);
+}
+
+.prompt-row button:disabled {
+  color: var(--muted-foreground);
+  background: var(--background-100);
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .chat-message {
