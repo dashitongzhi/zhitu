@@ -53,6 +53,20 @@ func TestResumeCopilotChatRetriesInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestCompleteCopilotLLMResponseRequiresTaskResult(t *testing.T) {
+	base := &copilotLLMResponse{Reply: "已完成"}
+	if completeCopilotLLMResponse(CopilotTaskProjectOptimize, base) {
+		t.Fatal("project task accepted a missing project result")
+	}
+	base.Project = &CopilotProjectResult{CurrentIssues: []string{"缺少量化结果"}}
+	if !completeCopilotLLMResponse(CopilotTaskProjectOptimize, base) {
+		t.Fatal("project task rejected a complete project result")
+	}
+	if !completeCopilotLLMResponse(CopilotTaskCareerChat, &copilotLLMResponse{Reply: "回答"}) {
+		t.Fatal("career chat rejected a textual reply")
+	}
+}
+
 func newCopilotTestService(t *testing.T) (*ResumeCopilotService, *gorm.DB, *models.Resume, *models.ResumeVersion) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())), &gorm.Config{
