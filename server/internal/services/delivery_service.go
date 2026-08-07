@@ -70,16 +70,16 @@ func NewDeliveryService(db *gorm.DB) *DeliveryService {
 
 // CreateDeliveryInput 创建投递入参
 type CreateDeliveryInput struct {
-	Company      string `json:"company" binding:"required"`
-	Position     string `json:"position" binding:"required"`
-	Channel      string `json:"channel" binding:"required"`
-	ApplyDate    string `json:"apply_date" binding:"required"`
-	Priority     string `json:"priority"`
-	JDText       string `json:"jd_text"`
-	ResumeVerID  uint   `json:"resume_version_id"`
-	HRContact    string `json:"hr_contact"`
-	NextStep     string `json:"next_step"`
-	Remark       string `json:"remark"`
+	Company     string `json:"company" binding:"required"`
+	Position    string `json:"position" binding:"required"`
+	Channel     string `json:"channel" binding:"required"`
+	ApplyDate   string `json:"apply_date" binding:"required"`
+	Priority    string `json:"priority"`
+	JDText      string `json:"jd_text"`
+	ResumeVerID uint   `json:"resume_version_id"`
+	HRContact   string `json:"hr_contact"`
+	NextStep    string `json:"next_step"`
+	Remark      string `json:"remark"`
 }
 
 // List 列出用户投递记录，支持按 status / channel 筛选
@@ -197,7 +197,7 @@ func (s *DeliveryService) Delete(userID, id uint) error {
 	if err := s.db.Where("delivery_id = ?", id).Delete(&models.DeliveryFeedback{}).Error; err != nil {
 		return err
 	}
-	return s.db.Delete(&models.Delivery{}).Error
+	return s.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.Delivery{}).Error
 }
 
 // ChangeStatus 变更投递状态，校验流转合法性
@@ -357,10 +357,10 @@ func (s *DeliveryService) DeleteFeedback(userID, deliveryID, feedbackID uint) er
 
 // DeliveryStats 投递统计
 type DeliveryStats struct {
-	Total       int64 `json:"total"`        // 总投递数
-	InProgress  int64 `json:"in_progress"`  // 进行中（pending + written_test + interview + waiting_offer）
-	OfferCount  int64 `json:"offer_count"`  // 已获 Offer
-	Rejected    int64 `json:"rejected"`     // 已拒绝
+	Total      int64 `json:"total"`       // 总投递数
+	InProgress int64 `json:"in_progress"` // 进行中（pending + written_test + interview + waiting_offer）
+	OfferCount int64 `json:"offer_count"` // 已获 Offer
+	Rejected   int64 `json:"rejected"`    // 已拒绝
 }
 
 // GetStats 统计用户投递概览
@@ -377,7 +377,7 @@ func (s *DeliveryService) GetStats(userID uint) (*DeliveryStats, error) {
 
 // DeliveryFunnel 投递漏斗
 type DeliveryFunnel struct {
-	Applied         int64   `json:"applied"`          // 投递数
+	Applied         int64   `json:"applied"`           // 投递数
 	WrittenTestPass int64   `json:"written_test_pass"` // 笔试通过数
 	FirstPass       int64   `json:"first_pass"`        // 一面通过数
 	SecondPass      int64   `json:"second_pass"`       // 二面通过数
