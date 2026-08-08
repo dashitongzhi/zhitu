@@ -197,10 +197,11 @@ func (s *ResumeCopilotService) ChatStream(ctx context.Context, userID uint, in *
 
 	var generated copilotLLMResponse
 	if err := decodeCopilotLLMResponse(raw.String(), &generated); err != nil || !completeCopilotLLMResponse(in.Task, &generated) {
-		generated, err = s.retryCopilotJSON(ctx, messages, in.Task)
-		if err != nil {
-			return nil, err
+		retryGenerated, retryErr := s.retryCopilotJSON(ctx, messages, in.Task)
+		if retryErr != nil {
+			return nil, retryErr
 		}
+		generated = *retryGenerated
 	}
 	return buildCopilotResponse(in, contextData, &generated), nil
 }
