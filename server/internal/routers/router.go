@@ -195,9 +195,6 @@ func New(deps Deps) *gin.Engine {
 		}
 	}
 
-	// 静态文件服务：/static/* 映射到存储目录，用于访问上传的音频、TTS、简历文件
-	r.Static("/static", deps.Config.Storage.BaseDir)
-
 	// 404 兜底
 	r.NoRoute(func(c *gin.Context) {
 		utils.NotFound(c, "route not found")
