@@ -15,18 +15,19 @@ import (
 
 // Deps 路由初始化所需依赖
 type Deps struct {
-	Config           *config.Config
-	DB               *gorm.DB
-	JWTService       *services.JWTService
-	AuthService      *services.AuthService
-	LLMService       *services.LLMService
-	AuthHandler      *handlers.AuthHandler
-	ProfileHandler   *handlers.ProfileHandler
-	ResumeHandler    *handlers.ResumeHandler
-	CopilotHandler   *handlers.CopilotHandler
-	InterviewHandler *handlers.InterviewHandler
-	DeliveryHandler  *handlers.DeliveryHandler
-	AdminHandler     *handlers.AdminHandler
+	Config              *config.Config
+	DB                  *gorm.DB
+	JWTService          *services.JWTService
+	AuthService         *services.AuthService
+	LLMService          *services.LLMService
+	AuthHandler         *handlers.AuthHandler
+	ProfileHandler      *handlers.ProfileHandler
+	ResumeHandler       *handlers.ResumeHandler
+	CopilotHandler      *handlers.CopilotHandler
+	BrowserStateHandler *handlers.BrowserStateHandler
+	InterviewHandler    *handlers.InterviewHandler
+	DeliveryHandler     *handlers.DeliveryHandler
+	AdminHandler        *handlers.AdminHandler
 }
 
 // New 构造 gin 引擎并注册全部路由
@@ -140,6 +141,13 @@ func New(deps Deps) *gin.Engine {
 		{
 			copilot.POST("/chat", deps.CopilotHandler.Chat)
 			copilot.POST("/apply", deps.CopilotHandler.Apply)
+		}
+
+		browserState := v1.Group("/browser-state")
+		{
+			browserState.GET("/:key", deps.BrowserStateHandler.Get)
+			browserState.PUT("/:key", deps.BrowserStateHandler.Put)
+			browserState.DELETE("/:key", deps.BrowserStateHandler.Delete)
 		}
 
 		// ---------- 模拟面试 ----------
