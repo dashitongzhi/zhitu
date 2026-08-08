@@ -156,6 +156,7 @@ func New(deps Deps) *gin.Engine {
 			interviews.GET("", deps.InterviewHandler.List)
 			interviews.POST("", deps.InterviewHandler.Create)
 			interviews.GET("/:id", deps.InterviewHandler.Get)
+			interviews.DELETE("/:id", deps.InterviewHandler.Delete)
 			interviews.POST("/:id/start", deps.InterviewHandler.Start)
 			interviews.PATCH("/:id/mode", deps.InterviewHandler.SetMode)
 			interviews.POST("/:id/resume", deps.InterviewHandler.AttachResume)
