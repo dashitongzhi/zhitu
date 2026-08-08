@@ -87,6 +87,14 @@ export async function streamSSE(
   const reader = response.body.getReader()
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
+  let receivedTerminalEvent = false
+
+  const handleEvent = (event: SSEEvent) => {
+    if (['done', 'started', 'interview_ended', 'error'].includes(event.type)) {
+      receivedTerminalEvent = true
+    }
+    dispatchEvent(event, callbacks)
+  }
 
   try {
     while (true) {
@@ -113,7 +121,7 @@ export async function streamSSE(
           continue
         }
 
-        dispatchEvent(event, callbacks)
+        handleEvent(event)
       }
     }
 
@@ -123,7 +131,7 @@ export async function streamSSE(
       if (jsonStr) {
         try {
           const event = JSON.parse(jsonStr)
-          dispatchEvent(event, callbacks)
+          handleEvent(event)
         } catch {
           // 忽略解析错误
         }
@@ -133,6 +141,11 @@ export async function streamSSE(
     if ((err as Error).name !== 'AbortError') {
       callbacks.onError?.('读取流式响应失败')
     }
+    return
+  }
+
+  if (!receivedTerminalEvent && !options.signal?.aborted) {
+    callbacks.onError?.('响应提前结束，请重试')
   }
 }
 

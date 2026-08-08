@@ -164,3 +164,11 @@ func TestAnthropicChatStreamRejectsIncompleteStream(t *testing.T) {
 		t.Fatalf("ChatStream() error = %v, want ErrLLMStreamFailed", err)
 	}
 }
+
+func TestExtractJSONObjectWithSurroundingText(t *testing.T) {
+	input := `分析结果如下： {"reply":"包含 { 花括号 } 和 \"引号\"","match":null} 请查收。`
+	want := `{"reply":"包含 { 花括号 } 和 \"引号\"","match":null}`
+	if got := extractJSONObject(input); got != want {
+		t.Fatalf("extractJSONObject() = %q, want %q", got, want)
+	}
+}

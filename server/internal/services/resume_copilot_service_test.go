@@ -5,13 +5,76 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/glebarez/sqlite"
+	"github.com/zhitu/server/internal/config"
 	"github.com/zhitu/server/internal/models"
 	"gorm.io/gorm"
 )
+
+func TestResumeCopilotChatRetriesInvalidJSON(t *testing.T) {
+	var requests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		content := "not-json"
+		if requests.Add(1) == 2 {
+			content = `{"reply":"重试成功","match":null,"project":null,"prediction":null,"memory_summary":""}`
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"choices": []interface{}{map[string]interface{}{
+				"message": map[string]string{"role": "assistant", "content": content},
+			}},
+		})
+	}))
+	defer upstream.Close()
+
+	llm := NewLLMService(&config.LLMConfig{
+		Provider: "openai", BaseURL: upstream.URL, APIKey: "test-key",
+		ChatModel: "test-model", MaxTokens: 256, TimeoutSec: 5,
+	})
+	service := NewResumeCopilotService(llm, nil, nil)
+	result, err := service.Chat(context.Background(), 7, &CopilotInput{
+		Task: CopilotTaskCareerChat, DraftContent: "候选人有产品与研发经历",
+		Messages: []CopilotMessage{{Role: "user", Content: "请概括方向"}},
+	})
+	if err != nil {
+		t.Fatalf("chat after retry: %v", err)
+	}
+	if result.Reply != "重试成功" {
+		t.Fatalf("reply = %q", result.Reply)
+	}
+	if requests.Load() != 2 {
+		t.Fatalf("requests = %d, want 2", requests.Load())
+	}
+}
+
+func TestCompleteCopilotLLMResponseRequiresTaskResult(t *testing.T) {
+	base := &copilotLLMResponse{Reply: "已完成"}
+	if completeCopilotLLMResponse(CopilotTaskProjectOptimize, base) {
+		t.Fatal("project task accepted a missing project result")
+	}
+	base.Project = &CopilotProjectResult{CurrentIssues: []string{"缺少量化结果"}}
+	if !completeCopilotLLMResponse(CopilotTaskProjectOptimize, base) {
+		t.Fatal("project task rejected a complete project result")
+	}
+	if !completeCopilotLLMResponse(CopilotTaskCareerChat, &copilotLLMResponse{Reply: "回答"}) {
+		t.Fatal("career chat rejected a textual reply")
+	}
+}
+
+func TestCopilotTaskOutputSchemaIncludesProjectShape(t *testing.T) {
+	schema := copilotTaskOutputSchema(CopilotTaskProjectOptimize)
+	for _, field := range []string{"current_issues", "star_analysis", "rewritten_description", "rewritten_tech_stack"} {
+		if !strings.Contains(schema, field) {
+			t.Fatalf("project schema missing %q: %s", field, schema)
+		}
+	}
+}
 
 func newCopilotTestService(t *testing.T) (*ResumeCopilotService, *gorm.DB, *models.Resume, *models.ResumeVersion) {
 	t.Helper()
