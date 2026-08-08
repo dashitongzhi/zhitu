@@ -134,6 +134,7 @@ export const useCopilotStore = defineStore('copilot', () => {
     loading.value = true
     let success = false
     let pendingPersist: Promise<void> = Promise.resolve()
+    let streamingMessage: CopilotMessage | null = null
     try {
       const request: CopilotChatRequest = {
         task: session.task,
@@ -146,30 +147,49 @@ export const useCopilotStore = defineStore('copilot', () => {
       }
       await chatCopilot(request, {
         onStatus: () => undefined,
+        onDelta: (delta) => {
+          if (!streamingMessage) {
+            streamingMessage = {
+              role: 'assistant',
+              content: '',
+              created_at: new Date().toISOString(),
+            }
+            session.messages.push(streamingMessage)
+          }
+          streamingMessage.content += delta
+          session.updated_at = new Date().toISOString()
+        },
         onCopilotDone: (data) => {
           const result = data.result
           const reply = data.message?.content || result?.reply || ''
           if (!reply && !result) return
-          const assistant: CopilotMessage = {
-            role: 'assistant',
-            content: reply || '分析已完成，请查看下方结果。',
-            created_at: new Date().toISOString(),
-            result,
+          if (streamingMessage) {
+            streamingMessage.content = reply || streamingMessage.content || '分析已完成，请查看下方结果。'
+            streamingMessage.result = result
+          } else {
+            session.messages.push({
+              role: 'assistant',
+              content: reply || '分析已完成，请查看下方结果。',
+              created_at: new Date().toISOString(),
+              result,
+            })
           }
-          session.messages.push(assistant)
-          session.summary = data.memory_summary || result.memory_summary || session.summary
+          session.summary = data.memory_summary || result?.memory_summary || session.summary
           session.updated_at = new Date().toISOString()
           pendingPersist = persist(session)
           success = true
           if (result) input.onResult?.(result)
         },
         onError: (error) => {
-          const failure: CopilotMessage = {
-            role: 'assistant',
-            content: error || 'Copilot 暂时无法回答',
-            created_at: new Date().toISOString(),
+          if (streamingMessage) {
+            streamingMessage.content = error || 'Copilot 暂时无法回答'
+          } else {
+            session.messages.push({
+              role: 'assistant',
+              content: error || 'Copilot 暂时无法回答',
+              created_at: new Date().toISOString(),
+            })
           }
-          session.messages.push(failure)
           session.updated_at = new Date().toISOString()
           pendingPersist = persist(session)
           message.error(error || 'Copilot 暂时无法回答')
